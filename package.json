@@ -41,9 +41,11 @@
     "fflate": "^0.8.3"
   },
   "devDependencies": {
+    "@sanity/semantic-release-preset": "^6.0.0",
     "@types/node": "^22.20.1",
     "oxfmt": "^0.54.0",
     "oxlint": "^1.74.0",
+    "semantic-release": "^25.0.7",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"
   },

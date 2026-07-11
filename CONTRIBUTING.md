@@ -40,11 +40,11 @@ Avoid (CLI): looping placements, resolving project names, transforming meshes, a
 ## Workflow
 
 ```sh
-pnpm lint        # oxlint + oxfmt --check
-pnpm format      # oxfmt --write
-pnpm typecheck   # tsc --noEmit
-pnpm test        # vitest run
-pnpm build       # tsdown
+npm run lint       # oxlint + oxfmt --check
+npm run format     # oxfmt --write
+npm run typecheck  # tsc --noEmit
+npm test           # vitest run
+npm run build      # tsc -p tsconfig.build.json
 ```
 
 Run all of them before opening a pull request. New `api` functions need unit tests; new format findings should be documented in [`docs/formats.md`](./docs/formats.md), with the confidence level (confirmed in-engine vs inferred) stated.
