@@ -27,7 +27,7 @@ import type {
 import {loadRestPoses} from './object.ts'
 import {resolveGltfGroup, resolveGroup} from './textures.ts'
 
-const usage = `Usage: cetool level [options] <levelDir> [objects.dat]
+const usage = `Usage: cnetool level [options] <levelDir> [objects.dat]
 
 Assemble a whole level into one Wavefront OBJ: the terrain plus every object
 placed in the level's data1.bin (positioned + rotated).

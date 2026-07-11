@@ -4,7 +4,7 @@
  * `parseScript`/`decompileScript`. It emits a **complete, loadable `.scr`** (header +
  * per-handler descriptors + bytecode); the instruction stream is byte-identical to
  * `CPARSE.EXE` output, and the files load and run in the real engine (verified in-game:
- * cetool-compiled overrides for `palm`/`fueltank` behave as authored).
+ * cnetool-compiled overrides for `palm`/`fueltank` behave as authored).
  *
  * The language is small: `float`-only values and string literals (as `REF*` call
  * arguments), functions (event handlers) with parameters, `if`/`else`/`while`/`return`,

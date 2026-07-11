@@ -225,7 +225,7 @@ function build(items: GltfMeshInput[], options: GltfOptions): Built {
   })
 
   const doc: Record<string, unknown> = {
-    asset: {version: '2.0', generator: 'cetool'},
+    asset: {version: '2.0', generator: 'cnetool'},
     scene: 0,
     scenes: [{nodes: nodes.map((_, i) => i)}],
     nodes,

@@ -10,7 +10,7 @@ A script is **per-object**. Each placed mesh/object - the engine calls these **"
 
 Scripts are authored in a small **C-like language** and compiled to **stack-machine bytecode** (`.scr`) by the `CPARSE` tool. The VM is **untyped and float-based**: every value on the stack is a 32-bit float, whether it represents a number, a flag, an object handle, or a string-table index. A call pushes its arguments, executes `call "Name"`, and leaves its result (a float) on the stack.
 
-`cetool` reads this format: `parseScript` decodes the bytecode, `decompileScript` recovers the C-like source shown throughout this doc, and `disassembleScript` gives a raw opcode listing.
+`cnetool` reads this format: `parseScript` decodes the bytecode, `decompileScript` recovers the C-like source shown throughout this doc, and `disassembleScript` gives a raw opcode listing.
 
 ### Anatomy of a script
 

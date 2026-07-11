@@ -235,7 +235,7 @@ describe('compileScript - full .scr emission (matches CPARSE byte-for-byte)', ()
     // REFCallScript is variadic: [handlerArg…], target(str), instance(num), handler(str), [delay(num)].
     // The decompiler used to drop the leading handler args (it popped a fixed 3/4 operands), making
     // the round-trip lossy. Exercise every shape - with/without leading args, with/without delay -
-    // and assert the bytecode is byte-identical after decompile→recompile (both paths share cetool's
+    // and assert the bytecode is byte-identical after decompile→recompile (both paths share cnetool's
     // compiler, so the descriptor layout matches and any difference is a genuine args/delay loss).
     const callScriptSrc = [
       'Trig() {',

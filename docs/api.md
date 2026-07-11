@@ -1,9 +1,9 @@
 # API reference
 
-`cetool` is a TypeScript library for reading and writing the data files of Codename Eagle (1999). Everything is exported as named, import-what-you-need functions from the package root:
+`cnetool` is a TypeScript library for reading and writing the data files of Codename Eagle (1999). Everything is exported as named, import-what-you-need functions from the package root:
 
 ```ts
-import {parseArchive, extractEntries, parseMesh} from 'cetool'
+import {parseArchive, extractEntries, parseMesh} from 'cnetool'
 ```
 
 The library is pure ESM and operates on bytes and strings: functions take `Uint8Array` (or `string` for text formats) and return `Uint8Array`, strings, or plain objects. There is no file I/O in the API, so it runs unchanged in Node, browsers, and workers; read and write files yourself with `node:fs/promises` (or `fetch` in a browser). The examples below use Node.
@@ -39,7 +39,7 @@ High-level extraction: parses the archive and returns every entry in archive ord
 
 ```ts
 import {readFile, writeFile} from 'node:fs/promises'
-import {extractEntries} from 'cetool'
+import {extractEntries} from 'cnetool'
 
 const archive = await readFile('textures.dat')
 for (const entry of extractEntries(archive)) {
@@ -69,7 +69,7 @@ Builds a plain/object archive from named blobs, the inverse of `parseArchive`: e
 
 ```ts
 import {readFile, writeFile} from 'node:fs/promises'
-import {buildArchive, extractEntries, parseObjectTextures} from 'cetool'
+import {buildArchive, extractEntries, parseObjectTextures} from 'cnetool'
 
 const objects = await readFile('objects.dat')
 const entries = extractEntries(objects).map((e) => ({name: e.name, data: e.data}))
@@ -94,7 +94,7 @@ Decodes an uncompressed true-color TGA and re-encodes it as a PNG. A 32-bit TGA 
 
 ```ts
 import {readFile, writeFile} from 'node:fs/promises'
-import {extractEntries, tgaToPng} from 'cetool'
+import {extractEntries, tgaToPng} from 'cnetool'
 
 const archive = await readFile('textures.dat')
 for (const entry of extractEntries(archive)) {
@@ -146,7 +146,7 @@ Parses an `objects.dat` project blob into a mesh. A project is a level-of-detail
 
 ```ts
 import {readFile, writeFile} from 'node:fs/promises'
-import {extractFile, meshToObj, parseArchive, parseMesh} from 'cetool'
+import {extractFile, meshToObj, parseArchive, parseMesh} from 'cnetool'
 
 const objects = await readFile('objects.dat')
 const entry = parseArchive(objects).entries.find((e) => e.name.toLowerCase() === 'stbody')!
@@ -226,7 +226,7 @@ Assembles a level scene from `objects.dat`: optionally the terrain project, plus
 
 ```ts
 import {readFile, writeFile} from 'node:fs/promises'
-import {assembleLevel, meshesToObj, readLandscape} from 'cetool'
+import {assembleLevel, meshesToObj, readLandscape} from 'cnetool'
 
 const objects = await readFile('objects.dat')
 const scene = assembleLevel(objects, {
@@ -267,7 +267,7 @@ Extracts a level's existing tab map: finds the four `map<mapNumber><0..3>.tga` t
 
 ```ts
 import {readFile, writeFile} from 'node:fs/promises'
-import {encodePng, extractTabMap} from 'cetool'
+import {encodePng, extractTabMap} from 'cnetool'
 
 const map = extractTabMap(
   [await readFile('LEVEL1/leveltex.bin'), await readFile('textures.dat')],
@@ -320,7 +320,7 @@ Parses a compiled `.scr` into `{paramBytes, handlers}`: the total variable stora
 
 ```ts
 import {readFile, writeFile} from 'node:fs/promises'
-import {decompileScript, parseScript} from 'cetool'
+import {decompileScript, parseScript} from 'cnetool'
 
 const script = parseScript(await readFile('LEVEL1/palm.scr'))
 await writeFile('palm.scr.c', decompileScript(script))
@@ -344,7 +344,7 @@ Compiles `.scr` C-subset source to a complete, loadable `.scr` file (header + pe
 
 ```ts
 import {writeFile} from 'node:fs/promises'
-import {compileScript} from 'cetool'
+import {compileScript} from 'cnetool'
 
 const src = `
 startup() {
@@ -395,7 +395,7 @@ Parses a `.anm` vertex animation: `{frameCount, vertexCount, frames, transforms}
 
 ```ts
 import {readFile} from 'node:fs/promises'
-import {applyAnmFrame, parseAnm, restPoses} from 'cetool'
+import {applyAnmFrame, parseAnm, restPoses} from 'cnetool'
 
 const anm = parseAnm(await readFile(`ANM/${restPoses.motobody.anm}`))
 const restedBike = applyAnmFrame(motobodyMesh, anm.frames[restPoses.motobody.frame])
@@ -435,7 +435,7 @@ Parses an obfuscated fixed-chunk stat table (`data4.bin` weapon stats, `mdata4.b
 
 ```ts
 import {readFile, writeFile} from 'node:fs/promises'
-import {parseStatTable, setStatValue} from 'cetool'
+import {parseStatTable, setStatValue} from 'cnetool'
 
 const data4 = await readFile('data4.bin')
 const damage = parseStatTable(data4).find((f) => f.key === 'Damage')! // first weapon's Damage
@@ -468,7 +468,7 @@ Parses a dialogue file (`DIALOGUE.DAT`): a `Languages:N` header followed by reco
 
 ```ts
 import {readFile} from 'node:fs/promises'
-import {parseDialogue} from 'cetool'
+import {parseDialogue} from 'cnetool'
 
 const dialogue = parseDialogue(await readFile('DIALOGUE.DAT'))
 for (const entry of dialogue.entries) {
@@ -490,7 +490,7 @@ Resolves a level's ambient configuration (terrain, water, lighting, sky, weather
 
 ```ts
 import {readFile} from 'node:fs/promises'
-import {getLevelInfo, parseScript} from 'cetool'
+import {getLevelInfo, parseScript} from 'cnetool'
 
 const info = getLevelInfo(parseScript(await readFile('LEVEL1/MAINSCR.SCR')))
 console.log(info.landscape?.name, info.light.color, info.weather?.type)
@@ -518,7 +518,7 @@ Serializes light sources back to `LIGHTS.DAT` bytes, the inverse of `parseLights
 
 ## Exported types
 
-All types are exported from the package root (`import type {...} from 'cetool'`).
+All types are exported from the package root (`import type {...} from 'cnetool'`).
 
 ### Core primitives
 

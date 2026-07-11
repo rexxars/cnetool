@@ -5,7 +5,7 @@ import {parseArgs} from 'node:util'
 
 import {pngToTga, tgaToPng} from '../api/index.ts'
 
-const usage = `Usage: cetool convert <input> [output]
+const usage = `Usage: cnetool convert <input> [output]
 
 Convert between TGA and PNG by file extension:
   input.tga -> PNG   (default output: input.png)

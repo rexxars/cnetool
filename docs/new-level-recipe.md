@@ -24,19 +24,19 @@ Startup() {
 
 ## Minimum file set (the `LEVEL<n>/` folder)
 
-| File             | Role                                               | Source            | cetool tooling                                      |
-| ---------------- | -------------------------------------------------- | ----------------- | --------------------------------------------------- |
-| `World.dat`      | placements + spawns (Teamapos/Teambpos, flagbase)  | authored          | `formatWorld` ✅ (engine builds data1.bin)          |
-| `mainscr.scr`    | master setup (landscape/light/water/sky/respawn)   | authored          | `compileScript` ✅                                  |
-| `red.scr`        | player script                                      | authored          | reuse shipped (copy) ✅                             |
-| `MOBJS.DAT`      | object manifest `Name:`/`Type:` (name → behaviour) | authored          | `parseConfig`/`formatConfig` ✅                     |
-| `MAPMTX.DAT`     | world→minimap affine                               | authored          | `parseMatrix`/`formatMatrix` ✅ (+ `cetool tabmap`) |
-| `LOADING.DAT`    | loading-screen image id (`u32`)                    | authored          | trivial                                             |
-| `LIGHTS.DAT`     | light sources (often empty)                        | authored          | `parseLights`/`formatLights` ✅                     |
-| `objects.dat`    | terrain project + custom models                    | authored          | `serializeMesh` ✅ + `buildArchive({textures})` ✅  |
-| `leveltex.bin`   | ground/detail/tab-map textures                     | authored          | `buildTextureArchive` ✅ (+ `cetool tabmap`)        |
-| `<obj>.scr`      | behaviour for any custom objects used              | authored          | `compileScript` ✅                                  |
-| **`LEVELS.NFO`** | **global** registry entry `Name:… Val:<n>`         | authored (global) | `parseConfig` read; trivial append                  |
+| File             | Role                                               | Source            | cnetool tooling                                      |
+| ---------------- | -------------------------------------------------- | ----------------- | ---------------------------------------------------- |
+| `World.dat`      | placements + spawns (Teamapos/Teambpos, flagbase)  | authored          | `formatWorld` ✅ (engine builds data1.bin)           |
+| `mainscr.scr`    | master setup (landscape/light/water/sky/respawn)   | authored          | `compileScript` ✅                                   |
+| `red.scr`        | player script                                      | authored          | reuse shipped (copy) ✅                              |
+| `MOBJS.DAT`      | object manifest `Name:`/`Type:` (name → behaviour) | authored          | `parseConfig`/`formatConfig` ✅                      |
+| `MAPMTX.DAT`     | world→minimap affine                               | authored          | `parseMatrix`/`formatMatrix` ✅ (+ `cnetool tabmap`) |
+| `LOADING.DAT`    | loading-screen image id (`u32`)                    | authored          | trivial                                              |
+| `LIGHTS.DAT`     | light sources (often empty)                        | authored          | `parseLights`/`formatLights` ✅                      |
+| `objects.dat`    | terrain project + custom models                    | authored          | `serializeMesh` ✅ + `buildArchive({textures})` ✅   |
+| `leveltex.bin`   | ground/detail/tab-map textures                     | authored          | `buildTextureArchive` ✅ (+ `cnetool tabmap`)        |
+| `<obj>.scr`      | behaviour for any custom objects used              | authored          | `compileScript` ✅                                   |
+| **`LEVELS.NFO`** | **global** registry entry `Name:… Val:<n>`         | authored (global) | `parseConfig` read; trivial append                   |
 
 **Engine-generated (do not ship)** - created on load/exit: `acache` `faccache` `ocache` `scache` `scrcache` `texcache` `wcache.bin`.
 
@@ -48,7 +48,7 @@ The post-TOC region is the **texture-name list** (a `u32 count` + 13-byte NUL-pa
 
 ## Tiers (increasing self-containment)
 
-- **Tier 0 - works now.** New level reusing a **shipped terrain** (`REFSetLandscape("land1"…)` from the global `objects.dat`) + cetool-authored `World.dat`/`mainscr.scr`/`leveltex.bin`. No `objects.dat` build. Fastest path to "a new level loads".
+- **Tier 0 - works now.** New level reusing a **shipped terrain** (`REFSetLandscape("land1"…)` from the global `objects.dat`) + cnetool-authored `World.dat`/`mainscr.scr`/`leveltex.bin`. No `objects.dat` build. Fastest path to "a new level loads".
 - **Tier 1 - self-contained via swap.** Clone Fortress's folder; surgically swap `oldbf`→your terrain and its props (reusing names). Custom geometry, reused names. Needs no new tooling.
 - **Tier 2 - fully custom.** Fresh per-level `objects.dat` with custom-named projects - **now possible**: `buildArchive({textures})` writes a loadable archive.
 
@@ -64,7 +64,7 @@ Copying `level133/` → `LEVEL200/`, registering `Name:Test Fortress Val:200` in
 
 - **Spawn conventions** - `Teamapos`/`Teambpos` are the MP team spawn markers (per the community mapmaker FAQ); they must be **defined**, and the **default entries the editor seeds into a fresh `World.dat` (anything present that you did not place yourself) must be deleted** - otherwise you "fall from the sky" at spawn. The SP player (`RED`) spawns at **world origin `(0,0,0)`** (the 3D home-grid intersection), so terrain must sit _below_ the origin or you start stuck in the ground. (`flagbase`/`redstart` roles are not yet confirmed.)
 
-**Tab-map generation is solved and in-engine-validated**: `cetool tabmap <levelDir>` renders the terrain top-down and writes a `leveltex.bin` (the four `MAP<n>0..3` tiles in the texture-archive format) plus the matching `MAPMTX.DAT`. The map number defaults correctly (levels 133-247 → `333`, else the level number); for other numbers wire `REFUseMapNumber(<n>)`. **Delete the level's `*cache.bin` after installing** so the engine rebuilds against the new files. See [`formats.md`](./formats.md) for the texture-archive format, tile layout, and map-number rule.
+**Tab-map generation is solved and in-engine-validated**: `cnetool tabmap <levelDir>` renders the terrain top-down and writes a `leveltex.bin` (the four `MAP<n>0..3` tiles in the texture-archive format) plus the matching `MAPMTX.DAT`. The map number defaults correctly (levels 133-247 → `333`, else the level number); for other numbers wire `REFUseMapNumber(<n>)`. **Delete the level's `*cache.bin` after installing** so the engine rebuilds against the new files. See [`formats.md`](./formats.md) for the texture-archive format, tile layout, and map-number rule.
 
 ## Alternative: the in-engine editor (community-documented)
 
@@ -72,13 +72,13 @@ Copying `level133/` → `LEVEL200/`, registering `Name:Test Fortress Val:200` in
 
 - **Launch (1.36 only):** put the level in a `level250/` dir (MP number must be > `128`), add it to `LEVELS.NFO`, and **host** a game on it - you spawn into the editor. **The folder trick is broken on 1.41+** (the engine rewrites any `level250\` path to the `+edit` directory and the load dies - see [game-flow.md](./game-flow.md#level-250---the-built-in-editor-and-why-the-136-folder-trick-broke-in-141)); there, launch with `ce.exe +edit "<leveldir>"` instead (which also skips the `level250` restriction). A dir copied in as `Level_*` is auto-numbered into `LEVELS.NFO`.
 - **Placing:** `F12` console → `place <object>` (eg `place house`, `place flagbase`); numpad 8/2/4/6 move, `0` reset, `5` drop; **shoot a placed object to delete it**. Exit (Esc/F10) to save - this writes the level's text `World.dat` (the editable twin of `data1.bin` - `formatWorld`/`parseWorld`).
-- **Tab map:** hold **`~` + arrow keys** to move the map vs the world, **End/PageDown** to scale, **`~` + numpad 5** to save - i.e. the editor authors `MAPMTX.DAT` interactively (matching cetool's `tabMapMatrix`). A custom tab map still goes in `leveltex.bin` as `map<n>0..3.tga`, and a blank tab map is fixed by `REFUseMapNumber(<n>)` in the level's startup script.
+- **Tab map:** hold **`~` + arrow keys** to move the map vs the world, **End/PageDown** to scale, **`~` + numpad 5** to save - i.e. the editor authors `MAPMTX.DAT` interactively (matching cnetool's `tabMapMatrix`). A custom tab map still goes in `leveltex.bin` as `map<n>0..3.tga`, and a blank tab map is fixed by `REFUseMapNumber(<n>)` in the level's startup script.
 - **`LEVELS.NFO` gotcha:** end the file with a trailing newline after the last entry, or the level loads to a **black screen** (independently reproduced); level names must be ≤ 12 chars.
 - **Placement quirks:** vehicles fall to the terrain when first entered (place them over water on a building to keep them on top); a helicopter shows as a bomber plane in the editor but loads correctly in 1.4x (no per-level `.scr` needed).
 
 ## Engine/authoring constraints (corroborated by the community mapmaker FAQ)
 
-External authoring facts from the `codename2.topcities.com` mapmaker FAQ (the 3ds-max + mapmaker toolchain), kept here as engine-behaviour reference - much is tool-workflow (flip normals, UVW modifiers) and not cetool's concern, but these touch the byte/engine level:
+External authoring facts from the `codename2.topcities.com` mapmaker FAQ (the 3ds-max + mapmaker toolchain), kept here as engine-behaviour reference - much is tool-workflow (flip normals, UVW modifiers) and not cnetool's concern, but these touch the byte/engine level:
 
 - **World scale** - No Man's Land is **30720 × 30720** units, a **18 × 18** terrain grid → each landscape polygon ≈ **1706** units. Maps can be any size; the playable plane is typically cut into 3×3 squares textured with ≤512×512 (256×256 best). Useful for sizing custom terrain and for sanity-checking `tabMapWindowForMesh` framing.
 - **Polygon budgets** - keep a **landscape < 8000** faces and an **object's high-LOD < 800** faces; exceeding them lags/crashes the renderer. (Fortress's `oldbf` is ~8129 faces - right at the line.)
@@ -90,5 +90,5 @@ External authoring facts from the `codename2.topcities.com` mapmaker FAQ (the 3d
 
 ## Known limitations
 
-- **Custom content in a clone is not yet verified**: swapping the cloned level's terrain blob (surgical patch) and adding cetool-authored placements/scripts - i.e. custom _content_ in a self-contained level - has not been load-tested in-engine.
-- **A fully from-scratch level is not yet demonstrated**: `buildArchive({textures})`, the small write paths (`MOBJS.DAT`/`MAPMTX.DAT`/`LIGHTS.DAT`), and the tab-map (`cetool tabmap`) are all done; the spawn conventions above are the missing piece before a `LEVEL<n>/` can be assembled with no donor level.
+- **Custom content in a clone is not yet verified**: swapping the cloned level's terrain blob (surgical patch) and adding cnetool-authored placements/scripts - i.e. custom _content_ in a self-contained level - has not been load-tested in-engine.
+- **A fully from-scratch level is not yet demonstrated**: `buildArchive({textures})`, the small write paths (`MOBJS.DAT`/`MAPMTX.DAT`/`LIGHTS.DAT`), and the tab-map (`cnetool tabmap`) are all done; the spawn conventions above are the missing piece before a `LEVEL<n>/` can be assembled with no donor level.

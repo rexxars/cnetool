@@ -506,7 +506,7 @@ export const assemblyGeometry: ControllableGeometryMap = {
  * Alt-skin texture swaps per controllable variant. Some vehicles are one mesh with two
  * skins picked by the placement name; CE bakes the swap in-engine (a face-texture
  * rewrite `X.tga -> X2.tga` for the alt variant, `FUN_0044d0e0`; the `*2` textures ship
- * in `texsec.dat`). `assembleLevel`/`cetool object` pass the matching entry to
+ * in `texsec.dat`). `assembleLevel`/`cnetool object` pass the matching entry to
  * {@link createTextureResolver} so the export shows the alt skin instead of the base.
  *
  * Confirmed from the setup functions and the class->name table:

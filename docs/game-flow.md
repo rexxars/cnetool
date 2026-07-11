@@ -188,5 +188,5 @@ When the level ends, **teardown** (`FUN_00441a10`) tears down render/input/timer
 
 ## What this enables / blocks
 
-- **Readable now:** the full `objects.dat` mesh format (vertices/faces/materials/UVs; terrain is `land<n>`/`level<n>` projects) with a **write path**, the `.scr` VM end-to-end (disassembler + decompiler + byte-exact compiler) with all `REF` builtins and callbacks, the per-level **placements** (`data1.bin`/`World.dat`, read+write), AI routes (`data2.bin`), `.anm` animations, textures, audio, and all text/config/stat tables. A whole level - terrain + placed objects - can be assembled into one scene (`cetool level`).
+- **Readable now:** the full `objects.dat` mesh format (vertices/faces/materials/UVs; terrain is `land<n>`/`level<n>` projects) with a **write path**, the `.scr` VM end-to-end (disassembler + decompiler + byte-exact compiler) with all `REF` builtins and callbacks, the per-level **placements** (`data1.bin`/`World.dat`, read+write), AI routes (`data2.bin`), `.anm` animations, textures, audio, and all text/config/stat tables. A whole level - terrain + placed objects - can be assembled into one scene (`cnetool level`).
 - **Remaining:** assembling a fully from-scratch level; the spawn conventions are the main open question (see [`new-level-recipe.md`](./new-level-recipe.md)).

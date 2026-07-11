@@ -5,7 +5,7 @@ import {parseArgs} from 'node:util'
 
 import {extractEntries, tgaToPng} from '../api/index.ts'
 
-const usage = `Usage: cetool extract [options] <archive...>
+const usage = `Usage: cnetool extract [options] <archive...>
 
 Extract every entry from one or more Codename Eagle archives (eg textures.dat,
 menupics.dat, objects.dat). Texture entries are rebuilt into standalone TGA

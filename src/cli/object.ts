@@ -34,7 +34,7 @@ import type {
 } from '../api/index.ts'
 import {resolveGltfGroup, resolveGroup} from './textures.ts'
 
-const usage = `Usage: cetool object [options] <objects.dat> <name...>
+const usage = `Usage: cnetool object [options] <objects.dat> <name...>
 
 Export one assembled model per name to a Wavefront OBJ. A name is either a plain
 "project" in objects.dat (eg StBody) or a controllable vehicle/turret key (eg car,

@@ -49,7 +49,7 @@ describe('parsePlacements', () => {
   test('reads records whose markers differ (1.42 sebguard appends)', () => {
     // The unofficial 1.42 patch appended sebguard records to LEVEL130/131's
     // data1.bin with a different (stale-pointer) marker than the rest of the
-    // file; the engine ignores the marker field, so cetool must too.
+    // file; the engine ignores the marker field, so cnetool must too.
     const ident = [1, 0, 0, 0, 1, 0, 0, 0, 1]
     const data = new Uint8Array(160)
     data.set(record('bridge_01', [1, 2, 3], ident, 0x006cfc6f), 0)

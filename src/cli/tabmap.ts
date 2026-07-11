@@ -33,7 +33,7 @@ import type {
   TabMapWindow,
 } from '../api/index.ts'
 
-const usage = `Usage: cetool tabmap [options] <levelDir> [objects.dat]
+const usage = `Usage: cnetool tabmap [options] <levelDir> [objects.dat]
 
 Generate a level's tab map: render the terrain top-down, pack the four tiles
 into a leveltex.bin (the only archive the engine loads tiles from), and compute

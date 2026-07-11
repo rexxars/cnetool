@@ -1,5 +1,5 @@
 {
-  "name": "cetool",
+  "name": "cnetool",
   "version": "0.1.0",
   "description": "Tools for working with Codename Eagle game",
   "keywords": [
@@ -12,10 +12,10 @@
   "author": "Espen Hovlandsdal <espen@hovlandsdal.com>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rexxars/cetool.git"
+    "url": "git+https://github.com/rexxars/cnetool.git"
   },
   "bin": {
-    "cetool": "dist/cli.js"
+    "cnetool": "dist/cli.js"
   },
   "files": [
     "dist",

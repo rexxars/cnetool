@@ -1,8 +1,8 @@
 # File inventory
 
-What the files in a Codename Eagle install are, grouped by kind. Obvious files (icons, readmes, installer, the executable's runtime DLLs) are omitted. "cetool" marks formats this library can read.
+What the files in a Codename Eagle install are, grouped by kind. Obvious files (icons, readmes, installer, the executable's runtime DLLs) are omitted. "cnetool" marks formats this library can read.
 
-Counts are from one full install (~2,300 files). The **cetool** column marks library support: ✅ = cetool has an API/CLI for it, ⚠️ = partially handled, ❌ = no library support yet. A ❌ format may still be fully documented - the "(decoded)" notes mean the byte format is understood - see [`formats.md`](./formats.md) for the specs.
+Counts are from one full install (~2,300 files). The **cnetool** column marks library support: ✅ = cnetool has an API/CLI for it, ⚠️ = partially handled, ❌ = no library support yet. A ❌ format may still be fully documented - the "(decoded)" notes mean the byte format is understood - see [`formats.md`](./formats.md) for the specs.
 
 ## Top-level layout
 
@@ -19,11 +19,11 @@ Counts are from one full install (~2,300 files). The **cetool** column marks lib
 
 ## Packed archives
 
-| File                  | Format                    | Purpose                                                                | cetool |
-| --------------------- | ------------------------- | ---------------------------------------------------------------------- | ------ |
-| `24bits/textures.dat` | TOC + truncated-TGA blobs | All world/UI textures (1557)                                           | ✅     |
-| `MENU/menupics.dat`   | same container            | Menu graphics (308)                                                    | ✅     |
-| `objects.dat`         | same container            | The "project" model library (473) - mesh format decoded (read + write) | ✅     |
+| File                  | Format                    | Purpose                                                                | cnetool |
+| --------------------- | ------------------------- | ---------------------------------------------------------------------- | ------- |
+| `24bits/textures.dat` | TOC + truncated-TGA blobs | All world/UI textures (1557)                                           | ✅      |
+| `MENU/menupics.dat`   | same container            | Menu graphics (308)                                                    | ✅      |
+| `objects.dat`         | same container            | The "project" model library (473) - mesh format decoded (read + write) | ✅      |
 
 All three share one container: a `uint32` count, fixed 17-byte name+offset records, then the data blobs.
 
@@ -50,38 +50,38 @@ Compiled bytecode for the engine's "REF" script VM (see [`formats.md`](./formats
 
 ## Models & animation
 
-| File             | Format        | Purpose                                                                  | cetool |
-| ---------------- | ------------- | ------------------------------------------------------------------------ | ------ |
-| `objects.dat`    | "projects"    | 3D models + terrain (vertices/faces/materials/UVs, 3 LODs + detect hull) | ✅     |
-| `ANM/*.anm` (96) | vertex frames | Per-vertex keyframe animation (format + runtime decoded)                 | ✅     |
+| File             | Format        | Purpose                                                                  | cnetool |
+| ---------------- | ------------- | ------------------------------------------------------------------------ | ------- |
+| `objects.dat`    | "projects"    | 3D models + terrain (vertices/faces/materials/UVs, 3 LODs + detect hull) | ✅      |
+| `ANM/*.anm` (96) | vertex frames | Per-vertex keyframe animation (format + runtime decoded)                 | ✅      |
 
 ## Per-level files (`LEVEL<n>/`)
 
 Each level folder bundles:
 
-| File(s)                                  | Kind   | Purpose                                              | cetool |
-| ---------------------------------------- | ------ | ---------------------------------------------------- | ------ |
-| `MOBJS.DAT`                              | text   | Object instance manifest (`Name:`/`Type:`)           | ✅     |
-| `MISSION.DAT`, `BRIEF.DAT`, `ENDBRF.DAT` | text   | Briefing/mission text (localized)                    | ✅     |
-| `DIALOGUE.DAT`                           | text   | Level dialogue (localized)                           | ✅     |
-| `MAPMTX.DAT`                             | binary | World→minimap matrix                                 | ✅     |
-| `LIGHTS.DAT`                             | binary | Light sources (often empty)                          | ✅     |
-| `LOADING.DAT`                            | binary | Loading-screen image id (`uint32`)                   | ✅     |
-| `HiScores.dat`                           | text   | Per-level high scores (bare values, not `Key:Value`) | ❌     |
-| `MATS.DAT`                               | text   | Camera/node transforms (some levels)                 | ✅     |
-| `data1.bin`                              | binary | Object placements (name + position + 3×3 rotation)   | ✅     |
-| `data2.bin`                              | binary | AI entities + patrol routes (decoded)                | ❌     |
-| `<name>.<n>` (eg `plane2.1`)             | script | Per-instance `.scr` scripts                          | ✅     |
-| `AIMap`, `AIMap.raw`, `AIMap_8bit.raw`   | raw    | AI navigation grid (2048×2048 walkable mask)         | ❌     |
-| `*.scr`                                  | script | Per-level object & master scripts                    | ✅     |
-| `*cache.bin`                             | binary | Generated preload/index caches (not authored)        | -      |
-| `GAME*.SAV`                              | binary | Dev-leftover level-state checkpoints (decoded)       | ❌     |
+| File(s)                                  | Kind   | Purpose                                              | cnetool |
+| ---------------------------------------- | ------ | ---------------------------------------------------- | ------- |
+| `MOBJS.DAT`                              | text   | Object instance manifest (`Name:`/`Type:`)           | ✅      |
+| `MISSION.DAT`, `BRIEF.DAT`, `ENDBRF.DAT` | text   | Briefing/mission text (localized)                    | ✅      |
+| `DIALOGUE.DAT`                           | text   | Level dialogue (localized)                           | ✅      |
+| `MAPMTX.DAT`                             | binary | World→minimap matrix                                 | ✅      |
+| `LIGHTS.DAT`                             | binary | Light sources (often empty)                          | ✅      |
+| `LOADING.DAT`                            | binary | Loading-screen image id (`uint32`)                   | ✅      |
+| `HiScores.dat`                           | text   | Per-level high scores (bare values, not `Key:Value`) | ❌      |
+| `MATS.DAT`                               | text   | Camera/node transforms (some levels)                 | ✅      |
+| `data1.bin`                              | binary | Object placements (name + position + 3×3 rotation)   | ✅      |
+| `data2.bin`                              | binary | AI entities + patrol routes (decoded)                | ❌      |
+| `<name>.<n>` (eg `plane2.1`)             | script | Per-instance `.scr` scripts                          | ✅      |
+| `AIMap`, `AIMap.raw`, `AIMap_8bit.raw`   | raw    | AI navigation grid (2048×2048 walkable mask)         | ❌      |
+| `*.scr`                                  | script | Per-level object & master scripts                    | ✅      |
+| `*cache.bin`                             | binary | Generated preload/index caches (not authored)        | -       |
+| `GAME*.SAV`                              | binary | Dev-leftover level-state checkpoints (decoded)       | ❌      |
 
 The 3D **terrain/world geometry** for a level lives in `objects.dat` as a "project" named `land<n>` / `level<n>` (see [`formats.md`](./formats.md)); its mesh format (vertices/faces/materials/UVs) is now fully decoded. The `AIMap*` rasters here are AI navigation only (2048×2048 walkable/blocked mask + nav data).
 
 ## Global config & data (root)
 
-| File           | Kind            | Purpose                                           | cetool               |
+| File           | Kind            | Purpose                                           | cnetool              |
 | -------------- | --------------- | ------------------------------------------------- | -------------------- |
 | `LEVELS.NFO`   | text            | Level name ↔ id index                             | ✅ `parseConfig`     |
 | `DIALOGUE.DAT` | text            | Master dialogue table                             | ✅                   |

@@ -11,9 +11,9 @@ import {runObject} from './cli/object.ts'
 import {runTabmap} from './cli/tabmap.ts'
 import {runWorld} from './cli/world.ts'
 
-const usage = `cetool - tools for Codename Eagle game data files
+const usage = `cnetool - tools for Codename Eagle game data files
 
-Usage: cetool <command> [options]
+Usage: cnetool <command> [options]
 
 Commands:
   extract <archive...>     Extract entries from an archive (textures -> TGA/PNG)
@@ -24,7 +24,7 @@ Commands:
   world <data1.bin|World.dat>  Convert placements between data1.bin and World.dat
   convert <file>           Convert a texture between TGA and PNG
 
-Run "cetool <command> --help" for command-specific options.
+Run "cnetool <command> --help" for command-specific options.
 `
 
 async function main(argv: string[]): Promise<void> {

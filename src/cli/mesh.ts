@@ -14,7 +14,7 @@ import {
 import type {MeshLod, MeshToObjOptions, ObjUp, ResolvedTexture} from '../api/index.ts'
 import {resolveGroup} from './textures.ts'
 
-const usage = `Usage: cetool mesh [options] <objects.dat> [name...]
+const usage = `Usage: cnetool mesh [options] <objects.dat> [name...]
 
 Export "project" meshes from objects.dat to Wavefront OBJ files. With no names,
 every project that has geometry is exported (terrain projects are named land<n>

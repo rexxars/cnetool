@@ -1,8 +1,8 @@
-# cetool
+# cnetool
 
-[![npm version](https://img.shields.io/npm/v/cetool.svg?style=flat-square)](https://www.npmjs.com/package/cetool)
+[![npm version](https://img.shields.io/npm/v/cnetool.svg?style=flat-square)](https://www.npmjs.com/package/cnetool)
 
-Tools for working with [Codename Eagle](https://en.wikipedia.org/wiki/Codename:_Eagle) game data files. Use it programmatically as a library, or through the `cetool` command line interface. The library is split into an `api` layer (operates on `Uint8Array`) and a Node.js `cli` layer that wraps it - the CLI is a thin shell around the same API methods you can call yourself.
+Tools for working with [Codename Eagle](https://en.wikipedia.org/wiki/Codename:_Eagle) game data files. Use it programmatically as a library, or through the `cnetool` command line interface. The library is split into an `api` layer (operates on `Uint8Array`) and a Node.js `cli` layer that wraps it - the CLI is a thin shell around the same API methods you can call yourself.
 
 It can unpack the game's `.dat` archives (`textures.dat`, `MENU/menupics.dat`, `objects.dat`, …) into their individual entries. Texture entries are rebuilt into standalone TGA files; entries whose payload isn't a known format are written out as their raw stored blobs. The reverse-engineered file format is documented in [`docs/formats.md`](./docs/formats.md).
 
@@ -13,30 +13,30 @@ Requires Node.js 22.19 or higher. Pure ESM.
 ## Installation
 
 ```bash
-npm install --save cetool
+npm install --save cnetool
 ```
 
 To use the CLI without installing it as a dependency:
 
 ```bash
-npx cetool extract textures.dat
+npx cnetool extract textures.dat
 ```
 
 ## CLI usage
 
-### `cetool extract <archive...>`
+### `cnetool extract <archive...>`
 
 Extract every entry from one or more archives. Textures become standalone TGA files; other entries are written as their raw stored blobs.
 
 ```bash
 # Extract into ./textures/ (a directory named after the archive)
-cetool extract textures.dat
+cnetool extract textures.dat
 
 # Extract as PNG instead of TGA
-cetool extract textures.dat --png
+cnetool extract textures.dat --png
 
 # Extract from multiple archives at once (any payload type)
-cetool extract textures.dat menupics.dat objects.dat
+cnetool extract textures.dat menupics.dat objects.dat
 ```
 
 | Option         | Description                                                         |
@@ -47,19 +47,19 @@ cetool extract textures.dat menupics.dat objects.dat
 
 Extraction is a faithful raw unpack: the game makes a 24-bit texture's black see-through at draw time (a per-draw color key, not part of the texture - see [`docs/formats.md`](./docs/formats.md)), so extracted images keep their black pixels. The model export commands below apply the key per face, matching the engine.
 
-### `cetool mesh <objects.dat> [name...]`
+### `cnetool mesh <objects.dat> [name...]`
 
 Export `objects.dat` "project" meshes - including level terrain (`land<n>` / `level<n>`) - to Wavefront OBJ files you can open in Blender. With no names, every project with geometry is exported.
 
 ```bash
 # Export every model + terrain to ./objects-meshes/
-cetool mesh objects.dat
+cnetool mesh objects.dat
 
 # Export specific projects
-cetool mesh objects.dat land1 level12 -o ./terrain
+cnetool mesh objects.dat land1 level12 -o ./terrain
 
 # Textured: also write .mtl + extract the referenced textures (needs 24bits/textures.dat)
-cetool mesh objects.dat dm1 --textures -o ./dm1
+cnetool mesh objects.dat dm1 --textures -o ./dm1
 ```
 
 | Option           | Description                                                                                                         |
@@ -73,19 +73,19 @@ cetool mesh objects.dat dm1 --textures -o ./dm1
 
 `mesh` exports raw single-project blobs. To export a **controllable vehicle** (which is an empty stub in `objects.dat` that the engine fills at runtime from several parts), use `object`.
 
-### `cetool object <objects.dat> <name...>`
+### `cnetool object <objects.dat> <name...>`
 
 Export one **assembled** model per name to a Wavefront OBJ. A name is either a plain project (eg `StBody`) or a controllable vehicle/turret key (eg `car`, `helicopter`, `tank2`, `aagun3`) - the latter is built from its body + parts at the body-local offsets the engine uses. `OBJECTS2.DAT` next to `objects.dat` (helicopter, zeppelin, battleships) is included automatically.
 
 ```bash
 # Single self-contained .glb per vehicle (geometry + textures + transparency) into ./models/
-cetool object objects.dat car helicopter tank2 --glb -o ./models
+cnetool object objects.dat car helicopter tank2 --glb -o ./models
 
 # Textured OBJ instead (.obj + .mtl + PNGs)
-cetool object objects.dat car -t -p -o ./models
+cnetool object objects.dat car -t -p -o ./models
 
 # A plain project works too (same as `mesh objects.dat StBody`)
-cetool object objects.dat StBody --glb
+cnetool object objects.dat StBody --glb
 ```
 
 Default output is OBJ; `--glb`/`--gltf` produce glTF, which carries textures and the black-key transparency with the model (and `.glb` is a single file that opens correctly in web viewers, Blender, and Preview - unlike OBJ, where transparency support varies).
@@ -100,16 +100,16 @@ Default output is OBJ; `--glb`/`--gltf` produce glTF, which carries textures and
 | `-o, --output`   | Output directory. Defaults to `<archive>-objects`.                                                              |
 | `-h, --help`     | Show help.                                                                                                      |
 
-### `cetool level <levelDir> [objects.dat]`
+### `cnetool level <levelDir> [objects.dat]`
 
 Assemble a whole level - terrain plus every object placed in its `data1.bin`, positioned and rotated - into one OBJ. The terrain project is auto-detected from the level's `MAINSCR.SCR`. A second object archive (`OBJECTS2.DAT`, added by the 1.33+ multiplayer patches) and a second texture archive (`24bits/texsec.dat`) are picked up automatically when present next to `objects.dat`. By default the export matches what's actually in-game: it skips `World.dat` `Dele` entries and objects whose startup script self-destructs at spawn (e.g. No Man's Land's cacti/palms, which call `REFSetTTL(MYSELF, 0)`) - pass `--keep-removed` to include them.
 
 ```bash
 # Geometry only
-cetool level path/to/LEVEL128 -o nomansland.obj
+cnetool level path/to/LEVEL128 -o nomansland.obj
 
 # Textured + with controllable vehicles/turrets (tanks, AA guns, 1.41 helicopters…)
-cetool level path/to/LEVEL128 --textures --controllable -o out/nomansland.obj
+cnetool level path/to/LEVEL128 --textures --controllable -o out/nomansland.obj
 ```
 
 | Option               | Description                                                                                                                                                         |
@@ -125,19 +125,19 @@ cetool level path/to/LEVEL128 --textures --controllable -o out/nomansland.obj
 | `--up <axis>`        | Up-axis of the export: `y` (default, upright Y-up), `z` (Z-up, eg Blender), or `raw` (as stored - the game is −Y-up).                                               |
 | `-o, --output`       | Output path. Defaults to `<levelDir name>-scene.{obj,glb,gltf}` to match the format.                                                                                |
 
-### `cetool tabmap <levelDir> [objects.dat]`
+### `cnetool tabmap <levelDir> [objects.dat]`
 
 Generate a level's in-game tab map (the full-screen map): render the terrain top-down by sampling its actual textures, pack the four 256×256 tiles into a `leveltex.bin`, and compute the matching `MAPMTX.DAT` so the player marker lands in the right place. By default the map frames the level's object placements (the gameplay area) with some surrounding water, then applies the shipped maps' look: grayscale with a diagonal light gradient, a white border, and a graph-paper grid. Install by copying the generated `leveltex.bin` + `MAPMTX.DAT` into the level directory.
 
 ```bash
 # Generate map tiles + matrix + preview PNG into ./LEVEL128-tabmap/
-cetool tabmap path/to/LEVEL128
+cnetool tabmap path/to/LEVEL128
 
 # Keep the full-color render and frame a custom world window
-cetool tabmap path/to/LEVEL128 --color --center 1024,1024 --size 4096
+cnetool tabmap path/to/LEVEL128 --color --center 1024,1024 --size 4096
 
 # Extract a level's existing shipped tab map to a PNG instead
-cetool tabmap path/to/LEVEL128 --extract
+cnetool tabmap path/to/LEVEL128 --extract
 ```
 
 | Option                | Description                                                                                                                        |
@@ -157,25 +157,25 @@ cetool tabmap path/to/LEVEL128 --extract
 | `-o, --output`        | Output directory (default `<levelDir name>-tabmap`).                                                                               |
 | `-h, --help`          | Show help.                                                                                                                         |
 
-### `cetool world <data1.bin | World.dat> [output]`
+### `cnetool world <data1.bin | World.dat> [output]`
 
 Convert a level's object placements between the binary `data1.bin` and the editable text `World.dat` (same data - name, position, 3×3 rotation). The direction is auto-detected. `data1.bin → World.dat` is the "give me something I can edit" step; edit the text, then convert back.
 
 ```bash
-cetool world LEVEL3/data1.bin -o World.dat   # binary -> editable text
-cetool world World.dat -o LEVEL3/data1.bin   # text -> binary (output required)
-cetool world LEVEL3/data1.bin                # prints World.dat text to stdout
+cnetool world LEVEL3/data1.bin -o World.dat   # binary -> editable text
+cnetool world World.dat -o LEVEL3/data1.bin   # text -> binary (output required)
+cnetool world LEVEL3/data1.bin                # prints World.dat text to stdout
 ```
 
 `World.dat`'s `Dele:` entries (a delete directive) are dropped when writing `data1.bin`, which has no equivalent; the `World.dat → data1.bin → World.dat` round trip is otherwise value-identical. `--marker <hex>` sets `data1.bin`'s record marker field (a stale per-file pointer in shipped files that the engine ignores; default 0).
 
-### `cetool convert <file> [output]`
+### `cnetool convert <file> [output]`
 
 Convert a texture between TGA and PNG (by extension). `.png → .tga` produces a game-style TGA (BGR, bottom-origin), so an edited PNG can be turned back into the game's format.
 
 ```bash
-cetool convert Water.tga          # -> Water.png
-cetool convert Water.png Out.tga  # -> Out.tga
+cnetool convert Water.tga          # -> Water.png
+cnetool convert Water.png Out.tga  # -> Out.tga
 ```
 
 ## API usage
@@ -184,7 +184,7 @@ Everything the CLI does is available as plain functions that take and return `Ui
 
 ```ts
 import {readFile, writeFile} from 'node:fs/promises'
-import {extractEntries} from 'cetool'
+import {extractEntries} from 'cnetool'
 
 const data = await readFile('textures.dat')
 
@@ -220,7 +220,7 @@ Most of the game's other `.dat` files are not archives but plain `Key:Value` tex
 
 ```ts
 import {readFile} from 'node:fs/promises'
-import {groupRecords, parseConfig} from 'cetool'
+import {groupRecords, parseConfig} from 'cnetool'
 
 const entries = parseConfig(await readFile('LEVEL12/MOBJS.DAT'))
 // entries: [{key: 'Name', value: 'plane2.1'}, {key: 'Type', value: 'enemyplane'}, …]
@@ -239,7 +239,7 @@ for (const record of groupRecords(entries, 'Name')) {
 The unit and weapon stat tables are the same `Key:Value` text, but obfuscated (every byte has `0x78` added) and interleaved with binary numeric fields. `deobfuscate` reverses the byte shift, and `parseConfig(..., {scan: true})` matches `Key:Value` pairs anywhere, skipping the binary:
 
 ```ts
-import {deobfuscate, groupRecords, parseConfig} from 'cetool'
+import {deobfuscate, groupRecords, parseConfig} from 'cnetool'
 
 const data = deobfuscate(await readFile('data4.bin'))
 for (const record of groupRecords(parseConfig(data, {scan: true}), 'Name')) {
@@ -256,7 +256,7 @@ The game's localized text comes in two related formats, each with a dedicated pa
 
 ```ts
 import {readFile} from 'node:fs/promises'
-import {parseDialogue} from 'cetool'
+import {parseDialogue} from 'cnetool'
 
 const {languageCount, entries} = parseDialogue(await readFile('DIALOGUE.DAT'))
 for (const {filename, translations} of entries) {
@@ -268,7 +268,7 @@ for (const {filename, translations} of entries) {
 `parseBriefing` reads `MISSION.DAT` / `ENDBRF.DAT` - free-form text split into sections by `//<language>:----` delimiter lines:
 
 ```ts
-import {parseBriefing} from 'cetool'
+import {parseBriefing} from 'cnetool'
 
 for (const {language, text} of parseBriefing(await readFile('LEVEL12/MISSION.DAT'))) {
   console.log(`--- ${language} ---\n${text}`)
@@ -283,7 +283,7 @@ Two of the small per-level binary files have decoders. Both take raw bytes. See 
 
 ```ts
 import {readFile} from 'node:fs/promises'
-import {parseMatrix, projectToMap} from 'cetool'
+import {parseMatrix, projectToMap} from 'cnetool'
 
 const matrix = parseMatrix(await readFile('LEVEL12/MAPMTX.DAT'))
 const pixel = projectToMap(matrix, worldX, worldZ) // -> {x, y}
@@ -292,7 +292,7 @@ const pixel = projectToMap(matrix, worldX, worldZ) // -> {x, y}
 `parseLights` reads `LIGHTS.DAT` - a header-less array of light sources (range, id, RGB color, world position). It returns `[]` for the empty files most levels ship:
 
 ```ts
-import {parseLights} from 'cetool'
+import {parseLights} from 'cnetool'
 
 for (const light of parseLights(await readFile('LEVEL3/LIGHTS.DAT'))) {
   console.log(light.id, light.color, light.position)
@@ -308,7 +308,7 @@ A project is a **level-of-detail chain** (high → medium → low); `parseMesh` 
 The game stores models **−Y-up**, so exports are flipped to a conventional upright **Y-up** by default. Pass `meshToObj`/`meshesToObj` an `up` option - `'z'` (Z-up, eg Blender/Unreal) or `'raw'` (untouched, −Y-up) - or call `orientMesh(mesh, up)` directly. Reflecting transforms reverse face winding so normals stay outward.
 
 ```ts
-import {extractFile, meshToObj, parseArchive, parseMesh} from 'cetool'
+import {extractFile, meshToObj, parseArchive, parseMesh} from 'cnetool'
 
 const data = await readFile('objects.dat')
 const {entries} = parseArchive(data)
@@ -319,20 +319,20 @@ console.log(mesh.vertices.length, mesh.faces.length) // 1768 3499
 await writeFile('land1.obj', meshToObj(mesh, {name: 'land1'}))
 ```
 
-A face's `texId` indexes a texture-name table in `objects.dat`; `parseObjectTextures` returns it (`texId → filename`), which you resolve against `textures.dat`. `meshToObj`'s `material` / `mtllib` options and `buildMtl` produce textured exports (this is what `cetool mesh --textures` does):
+A face's `texId` indexes a texture-name table in `objects.dat`; `parseObjectTextures` returns it (`texId → filename`), which you resolve against `textures.dat`. `meshToObj`'s `material` / `mtllib` options and `buildMtl` produce textured exports (this is what `cnetool mesh --textures` does):
 
 ```ts
-import {parseObjectTextures} from 'cetool'
+import {parseObjectTextures} from 'cnetool'
 
 const texNames = parseObjectTextures(data) // index by face.texId, e.g. 'MULT15.TGA'
 ```
 
 ### Whole-level assembly
 
-`assembleLevel` builds a whole scene - terrain plus every object in `data1.bin`, positioned and rotated - from `objects.dat`; `readLandscape` finds a level's terrain project from its `MAINSCR.SCR`. This is exactly what `cetool level` does (the CLI just reads the files and writes the OBJ).
+`assembleLevel` builds a whole scene - terrain plus every object in `data1.bin`, positioned and rotated - from `objects.dat`; `readLandscape` finds a level's terrain project from its `MAINSCR.SCR`. This is exactly what `cnetool level` does (the CLI just reads the files and writes the OBJ).
 
 ```ts
-import {assembleLevel, meshesToObj, readLandscape} from 'cetool'
+import {assembleLevel, meshesToObj, readLandscape} from 'cnetool'
 
 const objects = await readFile('objects.dat')
 const terrain = readLandscape(await readFile('LEVEL128/MAINSCR.SCR'))?.landscape
@@ -351,7 +351,7 @@ Lower-level building blocks are also exported: `parsePlacements` (decode `data1.
 `World.dat` is the engine's human-readable placement file (the text twin of `data1.bin`, shipped for multiplayer levels). `parseWorld` reads it into placements you can feed straight to `assembleLevel`, and `formatWorld` writes them back - so you can edit or author levels.
 
 ```ts
-import {assembleLevel, formatWorld, parseWorld} from 'cetool'
+import {assembleLevel, formatWorld, parseWorld} from 'cnetool'
 
 const entries = parseWorld(await readFile('LEVEL128/World.dat')) // WorldEntry[] (≈ Placement[])
 const scene = assembleLevel(objects, {placements: entries, terrain})
@@ -371,7 +371,7 @@ The game's behavior is driven by compiled scripts (`MAINSCR.SCR` and the per-obj
 
 ```ts
 import {readFile, writeFile} from 'node:fs/promises'
-import {compileScript, decompileScript, parseScript} from 'cetool'
+import {compileScript, decompileScript, parseScript} from 'cnetool'
 
 const script = parseScript(await readFile('LEVEL128/MAINSCR.SCR'))
 const source = decompileScript(script) // readable C-like source
@@ -380,18 +380,18 @@ const source = decompileScript(script) // readable C-like source
 await writeFile('LEVEL128/MAINSCR.SCR', compileScript(source))
 ```
 
-`disassembleScript` gives a raw instruction listing instead, and `selfDestructsAtSpawn` tells you whether a script removes its object at spawn (which is how `cetool level` knows what the game actually shows).
+`disassembleScript` gives a raw instruction listing instead, and `selfDestructsAtSpawn` tells you whether a script removes its object at spawn (which is how `cnetool level` knows what the game actually shows).
 
 ## Tab maps
 
-The in-game full-screen map is four texture tiles plus a world-to-pixel matrix; `renderTabMap` renders a terrain mesh top-down with real texture sampling, `sliceTabMapTiles` + `buildTextureArchive` pack it into a `leveltex.bin`, and `tabMapMatrix` computes the matching `MAPMTX.DAT`. `extractTabMap` reassembles a level's existing map into one image. This is what `cetool tabmap` drives; the individual steps (framing, grayscale styling, windowing) are all exported - see [`docs/api.md`](./docs/api.md#tab-maps) and the format notes in [`docs/formats.md`](./docs/formats.md).
+The in-game full-screen map is four texture tiles plus a world-to-pixel matrix; `renderTabMap` renders a terrain mesh top-down with real texture sampling, `sliceTabMapTiles` + `buildTextureArchive` pack it into a `leveltex.bin`, and `tabMapMatrix` computes the matching `MAPMTX.DAT`. `extractTabMap` reassembles a level's existing map into one image. This is what `cnetool tabmap` drives; the individual steps (framing, grayscale styling, windowing) are all exported - see [`docs/api.md`](./docs/api.md#tab-maps) and the format notes in [`docs/formats.md`](./docs/formats.md).
 
 ## Images
 
 Convert the game's TGA textures to/from PNG. The image module uses [`fflate`](https://github.com/101arrowz/fflate) for compression, so it has no native dependency.
 
 ```ts
-import {decodePng, decodeTga, pngToTga, tgaToPng} from 'cetool'
+import {decodePng, decodeTga, pngToTga, tgaToPng} from 'cnetool'
 
 const png = tgaToPng(await readFile('Water.tga')) // game TGA -> PNG
 const tga = pngToTga(await readFile('Edited.png')) // edited PNG -> game-style TGA

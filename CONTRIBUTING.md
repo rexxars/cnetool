@@ -2,7 +2,7 @@
 
 ## Architecture: the API does the work, the CLI is glue
 
-`cetool` is a library first and a CLI second. **All real logic lives in the `api` layer; the `cli` layer only does I/O and orchestration.**
+`cnetool` is a library first and a CLI second. **All real logic lives in the `api` layer; the `cli` layer only does I/O and orchestration.**
 
 ### The `api` layer (`src/api/`)
 

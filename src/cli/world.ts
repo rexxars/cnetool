@@ -4,7 +4,7 @@ import {parseArgs} from 'node:util'
 
 import {formatWorld, parsePlacements, parseWorld, serializePlacements} from '../api/index.ts'
 
-const usage = `Usage: cetool world <input> [output]
+const usage = `Usage: cnetool world <input> [output]
 
 Convert a level's object placements between the binary "data1.bin" and the editable
 text "World.dat" (same data: name + position + 3x3 rotation). Direction is auto-detected:
@@ -12,7 +12,7 @@ text "World.dat" (same data: name + position + 3x3 rotation). Direction is auto-
   data1.bin  ->  World.dat   binary -> editable text (prints to stdout if no output given)
   World.dat  ->  data1.bin   text -> binary (an output path is required)
 
-So the round trip is: cetool world data1.bin -o World.dat ; edit ; cetool world World.dat -o data1.bin
+So the round trip is: cnetool world data1.bin -o World.dat ; edit ; cnetool world World.dat -o data1.bin
 
 Options:
   -o, --output <file>   Output path (or pass it as the 2nd positional).

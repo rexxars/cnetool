@@ -8,7 +8,7 @@ const TOP_ORIGIN_BIT = 0x20 // descriptor bit 5: 1 = top-left origin, 0 = bottom
 
 /**
  * Decode an uncompressed true-color TGA (image type 2, 24- or 32-bit) into
- * top-down RGB(A) pixels. This covers the textures `cetool` extracts and the
+ * top-down RGB(A) pixels. This covers the textures `cnetool` extracts and the
  * game's own `.tga` files. Converts the stored BGR(A) to RGB(A) and flips
  * bottom-origin images so the result is always top-down.
  *
