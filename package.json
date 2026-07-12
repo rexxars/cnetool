@@ -1,0 +1,55 @@
+{
+  "name": "cetool",
+  "version": "0.1.0",
+  "description": "Tools for working with Codename Eagle game data files",
+  "keywords": [
+    "codename-eagle",
+    "game-files",
+    "modding",
+    "reverse-engineering",
+    "tga"
+  ],
+  "license": "MIT",
+  "author": "Espen Hovlandsdal <espen@hovlandsdal.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rexxars/cetool.git"
+  },
+  "bin": {
+    "cetool": "./dist/cli.mjs"
+  },
+  "files": [
+    "dist",
+    "docs"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "format": "oxfmt --write .",
+    "lint": "oxlint && oxfmt --check .",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "oxfmt": "^0.54.0",
+    "oxlint": "^1.74.0",
+    "tsdown": "^0.22.8",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
+  },
+  "engines": {
+    "node": ">=22.19"
+  }
+}
