@@ -45,6 +45,7 @@ export type {GltfFiles, GltfMaterialInput, GltfMeshInput, GltfOptions} from './g
 export {assembleLevel, readLandscape} from './level.ts'
 export type {AssembleLevelOptions, LevelScene, LevelSceneItem} from './level.ts'
 export {getLevelInfo} from './levelinfo.ts'
+export {formatLevelIndex, parseLevelIndex} from './levelindex.ts'
 export {parseBriefing, parseDialogue} from './localization.ts'
 export {
   buildMtl,
@@ -88,6 +89,7 @@ export {
 export type {StatField} from './stattable.ts'
 export {buildArchive, buildTextureArchive, parseArchive} from './parse.ts'
 export type {ArchiveInputEntry} from './parse.ts'
+export {formatServerInfo, parseServerInfo} from './servinfo.ts'
 export {extractTexture, getTextureInfo} from './texture.ts'
 export {formatWorld, parseWorld} from './world.ts'
 export type {WorldPlacement} from './world.ts'
@@ -101,6 +103,7 @@ export type {
   ExtractedEntry,
   ExtractedKind,
   LevelCall,
+  LevelIndexEntry,
   LevelInfo,
   LightSource,
   MapMatrix,
@@ -113,6 +116,7 @@ export type {
   ParsedArchive,
   ScriptHandler,
   ScriptInstruction,
+  ServerInfo,
   RgbColor,
   TextureInfo,
   Translation,

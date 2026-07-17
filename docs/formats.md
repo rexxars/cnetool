@@ -261,26 +261,27 @@ Validated by self-consistency (Euler's formula): `land1` has nv=1768, nEdges=526
 
 ## Other `.dat` files (not archives)
 
-Most `.dat` files in the game are **not** archives - they are individual data or config files. Across the game there are 125 `.dat` files of 17 distinct names; only three (`textures.dat`, `menupics.dat`, `objects.dat`) use the archive container above. The rest fall into two families.
+Most `.dat` files in the game are **not** archives - they are individual data or config files. Across the game there are 126 `.dat` files of 18 distinct names; only three (`textures.dat`, `menupics.dat`, `objects.dat`) use the archive container above. The rest fall into two families.
 
 There is a clear **global vs per-level** split. Global files live in the game root; each `LEVEL*/` folder carries its own copy of the per-level files.
 
-| File           | Scope     | Family | Purpose                                                       |
-| -------------- | --------- | ------ | ------------------------------------------------------------- |
-| `MISSION.DAT`  | per-level | text   | Mission text / objectives (localized, `//` comments)          |
-| `BRIEF.DAT`    | per-level | text   | Pre-mission briefing (`Text:`/`Name:`/`Dist:`/`Yaw:`/`Pit:`)  |
-| `ENDBRF.DAT`   | per-level | text   | End-of-mission briefing (localized)                           |
-| `DIALOGUE.DAT` | both      | text   | Localized dialogue (`Languages:N`, `Filename:`, `Eng:"…"`)    |
-| `MOBJS.DAT`    | per-level | text   | Map-object instance list (`Name:`/`Type:` records)            |
-| `MATS.DAT`     | per-level | text   | Camera/node transforms (`Name:`/`Translation:`/`Dof:`/`Up:`)  |
-| `KEYCONF.DAT`  | global    | text   | Input bindings (`Fire:DIK_SPACE MOUSE_LBUTTON`)               |
-| `KEYDEFS.DAT`  | global    | text\* | Key-name → scancode table (whitespace columns, not `Key:Val`) |
-| `HISCORES.DAT` | per-level | text\* | High scores (bare values, `-1`/`-1`/`-1`/`0`)                 |
-| `MAPMTX.DAT`   | per-level | binary | 9 float32 = 3×3 world→minimap affine matrix                   |
-| `LIGHTS.DAT`   | per-level | binary | Array of 23-byte light records (often empty)                  |
-| `LOADING.DAT`  | per-level | binary | Single uint32 - loading-screen image id                       |
-| `diacache.dat` | global    | binary | uint32 table - dialogue WAV-length cache (generated)          |
-| `menuinfo.dat` | global    | binary | Saved profile/options/progress (zlib + keyed-add cipher)      |
+| File           | Scope     | Family | Purpose                                                                      |
+| -------------- | --------- | ------ | ---------------------------------------------------------------------------- |
+| `MISSION.DAT`  | per-level | text   | Mission text / objectives (localized, `//` comments)                         |
+| `BRIEF.DAT`    | per-level | text   | Pre-mission briefing (`Text:`/`Name:`/`Dist:`/`Yaw:`/`Pit:`)                 |
+| `ENDBRF.DAT`   | per-level | text   | End-of-mission briefing (localized)                                          |
+| `DIALOGUE.DAT` | both      | text   | Localized dialogue (`Languages:N`, `Filename:`, `Eng:"…"`)                   |
+| `MOBJS.DAT`    | per-level | text   | Map-object instance list (`Name:`/`Type:` records)                           |
+| `MATS.DAT`     | per-level | text   | Camera/node transforms (`Name:`/`Translation:`/`Dof:`/`Up:`)                 |
+| `KEYCONF.DAT`  | global    | text   | Input bindings (`Fire:DIK_SPACE MOUSE_LBUTTON`)                              |
+| `KEYDEFS.DAT`  | global    | text\* | Key-name → scancode table (whitespace columns, not `Key:Val`)                |
+| `HISCORES.DAT` | per-level | text\* | High scores (bare values, `-1`/`-1`/`-1`/`0`)                                |
+| `MAPMTX.DAT`   | per-level | binary | 9 float32 = 3×3 world→minimap affine matrix                                  |
+| `LIGHTS.DAT`   | per-level | binary | Array of 23-byte light records (often empty)                                 |
+| `LOADING.DAT`  | per-level | binary | Single uint32 - loading-screen image id                                      |
+| `diacache.dat` | global    | binary | uint32 table - dialogue WAV-length cache (generated)                         |
+| `menuinfo.dat` | global    | binary | Saved profile/options/progress (zlib + keyed-add cipher)                     |
+| `servinfo.dat` | global    | binary | Host MP match settings - 4 × uint32 (fraglimit/scorelimit/timelimit/nextmap) |
 
 ### Text-config family (`Key:Value`)
 
@@ -424,6 +425,30 @@ So it's the menu's persisted **profile + progress + options** - the only genuine
 
 `cnetool`'s `parseMatrix` (with `projectToMap`) and `parseLights` decode the two structured ones (see the README).
 
+`servinfo.dat` is the **host's multiplayer match settings**: a header-less run of **4 × `uint32`** (little-endian), exactly 16 bytes. It is read and written only by the game **host** - both the loader (`FUN_004735c0` @ `0x4735c0`, `fopen(…,"rb")`) and the saver (`FUN_00473650` @ `0x473650`, `fopen(…,"wb")`) are gated on `FUN_00441560() != 0` (is-host) **and** the game-mode flag `DAT_004de78c & 1` (set in the deathmatch/team MP modes). On load the host reads the four values back into its match-state globals and calls `FUN_00473a60` to broadcast the limits to connected clients; on save it writes them straight back out.
+
+| Offset | Type   | Field      | Meaning                                                                           |
+| ------ | ------ | ---------- | --------------------------------------------------------------------------------- |
+| 0      | uint32 | fraglimit  | Kill limit (server message "Server set fraglimit to %d")                          |
+| 4      | uint32 | scorelimit | Score limit ("Server set scorelimit to %d")                                       |
+| 8      | uint32 | timelimit  | Time limit in **minutes** ("Server set timelimit to %d minutes")                  |
+| 12     | uint32 | nextmap    | Map-rotation target: the **level number** to load when the round ends (see below) |
+
+The field meanings are decoded from the server-command handler `FUN_00473950` (cases 0/1/2 = frag/score/time), the limit broadcaster `FUN_00473a60`, and the `nextmap` command handler `FUN_00476c50`. The fourth field is the server's **map rotation** ("nextmap") setting, a level number for the `LEVELS.NFO` index (resolved via `FUN_00442560`):
+
+- `0` = **rotation off** ("Nextmap mode off") - the host stays on the current map.
+- non-zero = the next level to switch to (`FUN_00476c50` sets it to `currentLevel + 1`, printing `Nextmap is "%s"`). When the round's time limit expires the host loads that level and then **advances** the value to the following level; if the next number isn't found in `LEVELS.NFO` it **wraps to `0x80` (128)** - No Man's Land / `dm1`, the base multiplayer map (`FUN_0047a880` @ `0x47a880`).
+
+**Every shipped copy is 16 zero bytes** - identical byte-for-byte across all versions on hand (1.41, 1.43, 1.50 and the MP demos), because the host only writes non-zero values after limits/rotation are configured for a hosted session; all-zero means "no limits, rotation off". It is not an archive and shares no structure with the `Key:Value` text family - just a fixed 16-byte settings blob.
+
+**Persistence (it survives restarts).** The file is a save/restore store, not a per-session scratchpad. The host **loads** it during multiplayer session init (`FUN_0047ae60` @ `0x47ae60`, the routine that also zeroes the player table) - which re-applies and re-broadcasts the four fields - and **saves** it during session teardown (`FUN_0047aef0` @ `0x47aef0`). So settings configured once persist to the next host start; they are not reset each time. A dedicated server can therefore be pre-seeded by writing the 16 bytes directly (eg `1E 00 00 00` timelimit = 30 min, `81 00 00 00` nextmap = 129) - the loader applies them on every host start without any console input. (A clean exit rewrites the file with the current runtime values, including the advanced `nextmap`; a crash simply leaves the pre-seeded file intact.)
+
+**Configured via host console commands** (all host-only, parsed in `FUN_00496800`-based dispatch): `fraglimit %d`, `scorelimit %d`, `timelimit %d`, `map <name>` (switch now), and `nextmap on` / `nextmap off` (enable/disable rotation; `on` sets the pointer to `currentLevel + 1`).
+
+**Map changes travel by name, not number.** When the host switches map (rotation or `map <name>`) it resolves the level number to a **name** via its own `LEVELS.NFO`, then broadcasts that name string to clients as network message type `0x3b` (`FUN_00473bc0`). Each client resolves the name back to a number against **its own** `LEVELS.NFO` (`FUN_00442480`, case-insensitive), so mismatched numbering between machines is fine as long as the display names match - but nothing checks that the map _content_ behind a shared name is identical, and CE multiplayer is host-authoritative, so a name collision with different content silently desyncs geometry. See [`LEVELS.NFO`](#levelsnfo---level-index).
+
+**Tooling.** `cnetool`'s `parseServerInfo` / `formatServerInfo` read and write the 16-byte blob, and the `cnetool servinfo` command reads or edits it (resolving a `--nextmap` name through `LEVELS.NFO` via `parseLevelIndex`). See the README.
+
 ## Other data files (`.bin`, `.nfo`)
 
 Besides the `.dat` files there are several `.bin` / `.nfo` data files.
@@ -439,7 +464,7 @@ Name:Eagle's Flight Val:12
 Name:No mans land Val:128      (128-132 are the bonus/multiplayer maps)
 ```
 
-Read it with `parseConfig`.
+Each line carries **two** keys (`Name:` and `Val:`), so the generic `parseConfig` (which splits on the first `:`) doesn't apply - read it with `cnetool`'s dedicated `parseLevelIndex` (→ `{name, number}[]`) / `formatLevelIndex`. The numbering has gaps and is not strictly ordered (Fever valley is `248`, Fortress `133`), which matters for rotation: the host's auto-advance is `currentLevel + 1` and wraps to `128` at the first missing number, so on the shipped index it cycles `128→129→130→131→132→133→128` and never reaches `248`. See [`servinfo.dat`](#other-dat-files-not-archives) for the rotation and the name-based map-change protocol.
 
 ### `data3.bin`, `data4.bin` - obfuscated stat tables
 

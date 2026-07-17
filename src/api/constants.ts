@@ -62,6 +62,9 @@ export const MAP_MATRIX_SIZE = MAP_MATRIX_VALUE_COUNT * 4
  * triplet is packed without padding, so the record is intentionally unaligned.
  */
 export const LIGHT_RECORD_LENGTH = 23
+
+/** `servinfo.dat` size: four little-endian uint32 fields. */
+export const SERVER_INFO_SIZE = 16
 export const LIGHT_RANGE_OFFSET = 0
 export const LIGHT_ID_OFFSET = 4
 export const LIGHT_COLOR_OFFSET = 8

@@ -178,6 +178,18 @@ cnetool convert Water.tga          # -> Water.png
 cnetool convert Water.png Out.tga  # -> Out.tga
 ```
 
+### `cnetool servinfo <servinfo.dat> [options]`
+
+Read or edit the host multiplayer match settings in `servinfo.dat` (fraglimit, scorelimit, timelimit in minutes, and the map-rotation "nextmap"). The game host loads these on session start and saves them on session end, so they persist across restarts - set them once for a dedicated server instead of typing console commands each launch. With no write options it prints the current settings; passing any write option edits the file in place (unspecified fields are preserved).
+
+```bash
+cnetool servinfo servinfo.dat                                   # show current settings
+cnetool servinfo servinfo.dat --time 30 --nextmap Breakpoint    # 30-min rounds, then rotate
+cnetool servinfo servinfo.dat --frag 25 --nextmap off           # 25 frags, rotation off
+```
+
+`--nextmap` takes a level number, a map name (resolved case-insensitively against `LEVELS.NFO`, default `./levels.nfo` or `--levels <file>`), or `off`. The map switch is broadcast to clients by name, so numbering can differ between machines as long as the display names match.
+
 ## API usage
 
 Everything the CLI does is available as plain functions that take and return `Uint8Array`s and data structures: only the CLI touches the filesystem, so the API works in Node, browsers and workers alike. The sections below tour the most common operations; the complete reference covering every export is in [`docs/api.md`](./docs/api.md).
@@ -297,6 +309,17 @@ import {parseLights} from 'cnetool'
 for (const light of parseLights(await readFile('LEVEL3/LIGHTS.DAT'))) {
   console.log(light.id, light.color, light.position)
 }
+```
+
+`parseServerInfo` / `formatServerInfo` read and write `servinfo.dat`, the host's persisted multiplayer match settings (`{fragLimit, scoreLimit, timeLimit, nextMap}` - four uint32). `parseLevelIndex` / `formatLevelIndex` read and write `LEVELS.NFO`, the level index (`{name, number}[]`), which the `nextMap` level number refers to:
+
+```ts
+import {formatServerInfo, parseLevelIndex, parseServerInfo} from 'cnetool'
+
+const levels = parseLevelIndex(await readFile('levels.nfo'))
+const nextMap = levels.find((l) => l.name.toLowerCase() === 'breakpoint')!.number
+const info = parseServerInfo(await readFile('servinfo.dat'))
+await writeFile('servinfo.dat', formatServerInfo({...info, timeLimit: 30, nextMap}))
 ```
 
 ## Meshes

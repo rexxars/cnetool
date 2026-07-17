@@ -516,6 +516,22 @@ Parses `LIGHTS.DAT`: a header-less array of 23-byte light records (`f32 range`, 
 
 Serializes light sources back to `LIGHTS.DAT` bytes, the inverse of `parseLights`. Round-trips losslessly.
 
+### `parseServerInfo(data: Uint8Array): ServerInfo`
+
+Parses `servinfo.dat`: the host's persisted multiplayer match settings, four little-endian uint32 fields (`fragLimit`, `scoreLimit`, `timeLimit` in minutes, `nextMap` level number). Throws if the data is shorter than 16 bytes.
+
+### `formatServerInfo(info: ServerInfo): Uint8Array`
+
+Serializes a `ServerInfo` back to `servinfo.dat` bytes (16 bytes), the inverse of `parseServerInfo`. Round-trips losslessly.
+
+### `parseLevelIndex(input: string | Uint8Array): LevelIndexEntry[]`
+
+Parses `LEVELS.NFO`: the level index, one `Name:<display name> Val:<number>` line per level, into `{name, number}` records (name → `LEVEL<n>/` folder number). Order and duplicates are preserved; blank and malformed lines are skipped. This handles the two-keys-per-line shape that the generic `parseConfig` does not. The `nextMap` field of `parseServerInfo` refers to these numbers.
+
+### `formatLevelIndex(entries: Iterable<LevelIndexEntry>): string`
+
+Serializes a level index back to `LEVELS.NFO` text, one CRLF-terminated `Name:<name> Val:<number>` line per entry. The inverse of `parseLevelIndex`.
+
 ## Exported types
 
 All types are exported from the package root (`import type {...} from 'cnetool'`).
@@ -579,6 +595,7 @@ All types are exported from the package root (`import type {...} from 'cnetool'`
 
 - `ConfigEntry`: a single `Key:Value` pair.
 - `ParseConfigOptions`: `parseConfig` options (`scan`).
+- `LevelIndexEntry`: one `LEVELS.NFO` line: a level's display `name` and its `number`.
 - `StatField`: a stat-table field: a `ConfigEntry` plus its `chunk` index for writing back.
 - `DialogueFile` / `DialogueEntry` / `Translation`: a parsed `DIALOGUE.DAT`, one dialogue line with its translations, and one localized string.
 - `BriefingSection`: one language's block of a briefing file.
@@ -587,6 +604,7 @@ All types are exported from the package root (`import type {...} from 'cnetool'`
 
 - `MapMatrix`: the `MAPMTX.DAT` 3x3 affine (9 row-major `values`).
 - `LightSource`: one `LIGHTS.DAT` record: `id`, `range`, `color`, `position`.
+- `ServerInfo`: the `servinfo.dat` host match settings: `fragLimit`, `scoreLimit`, `timeLimit` (minutes), `nextMap`.
 
 ### Tab maps
 

@@ -8,6 +8,7 @@ import {runExtract} from './cli/extract.ts'
 import {runLevel} from './cli/level.ts'
 import {runMesh} from './cli/mesh.ts'
 import {runObject} from './cli/object.ts'
+import {runServinfo} from './cli/servinfo.ts'
 import {runTabmap} from './cli/tabmap.ts'
 import {runWorld} from './cli/world.ts'
 
@@ -23,6 +24,7 @@ Commands:
   tabmap <levelDir>        Render the in-game tab map (tiles + MAPMTX.DAT) for a level
   world <data1.bin|World.dat>  Convert placements between data1.bin and World.dat
   convert <file>           Convert a texture between TGA and PNG
+  servinfo <servinfo.dat>  Read or edit host multiplayer match settings
 
 Run "cnetool <command> --help" for command-specific options.
 `
@@ -51,6 +53,9 @@ async function main(argv: string[]): Promise<void> {
       return
     case 'convert':
       await runConvert(rest)
+      return
+    case 'servinfo':
+      await runServinfo(rest)
       return
     case '-v':
     case '--version':

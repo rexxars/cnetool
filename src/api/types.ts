@@ -326,3 +326,32 @@ export interface ExtractedEntry {
   /** Whether `data` is a rebuilt TGA or the raw stored blob. */
   kind: ExtractedKind
 }
+
+/**
+ * The host multiplayer match settings persisted in `servinfo.dat` - four
+ * little-endian uint32 fields (16 bytes). Written by the game host on session
+ * end and reloaded on the next host start, so these settings survive restarts.
+ */
+export interface ServerInfo {
+  /** Kill limit that ends the round (0 = no limit). */
+  fragLimit: number
+  /** Score limit that ends the round (0 = no limit). */
+  scoreLimit: number
+  /** Time limit in **minutes** that ends the round (0 = no limit). */
+  timeLimit: number
+  /**
+   * Map-rotation target: the level number to switch to when a round ends.
+   * `0` disables rotation. When rotation is on, the host advances this by one
+   * each round, wrapping to `128` (No Man's Land) once the next level number is
+   * not found in `LEVELS.NFO`.
+   */
+  nextMap: number
+}
+
+/** One line of `LEVELS.NFO`: a level's display name and its numeric id. */
+export interface LevelIndexEntry {
+  /** Display name, eg `No mans land` (the `Name:` field). */
+  name: string
+  /** Numeric level id / `LEVEL<n>/` folder number (the `Val:` field). */
+  number: number
+}
