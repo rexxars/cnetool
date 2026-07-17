@@ -14,14 +14,25 @@ Each section flags confidence: **[Confirmed]** = verified by static analysis or 
 
 | Port    | Proto | Role                                                                                               | Confidence                           |
 | ------- | ----- | -------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| `24711` | UDP   | Game/session traffic (DirectPlay). Also where a _modern_ server's "type-3" status responder lives. | Confirmed                            |
+| `24711` | UDP   | Game/session traffic (DirectPlay). Default host/connect port, overridable via `+host <port>` / `+connect ip:port`. Also where a _modern_ server's "type-3" status responder lives. | Confirmed                            |
 | `4711`  | UDP   | GameSpy query port - where a server answers `\status\`-style queries.                              | Confirmed (live probe)               |
 | `27900` | UDP   | GameSpy master heartbeat port - where the server announces itself to the master (send-only).       | Confirmed (ce.exe uses `SOCK_DGRAM`) |
 | `210`   | UDP   | `iplist.exe` **local bind/source** port for its probes - and where a host's LAN beacon is sent.    | Confirmed                            |
 | `211`   | UDP   | `iplist.exe` legacy query **destination** port (`'B'`/`'G'` messages).                             | Confirmed                            |
 | `47624` | UDP   | Classic DirectPlay session enumeration (standard DPlay). CE's actual use here is unverified.       | Unconfirmed                          |
 
-> Note: `24711` is the documented, non-configurable game port. `4711` is the documented GameSpy query port. The other ports were recovered by reverse engineering and packet capture.
+> Note: `24711` is the **default** game/session port, not a fixed one — it is overridable at launch (see below). `4711` is the GameSpy query port and **is** fixed (hardcoded). The other ports were recovered by reverse engineering and packet capture.
+
+### Configuring the ports **[Confirmed - static analysis of 1.41]**
+
+The game/session port defaults to **24711** and is backed by a single port variable (`DAT_004c26d0`, initial value `0x6087`). Both launch flags that establish an endpoint write it, so it is configurable at startup:
+
+- `+host <port>` - the optional trailing integer after `+host` is `sscanf`'d as `%d` and stored (`FUN_004426a0` @ `0x4426a0`).
+- `+connect <ip>:<port>` - the `:port` field of the connect address writes the **same** variable.
+
+The parsed value replaces the 24711 default in the connection endpoint (`FUN_00442360` @ `0x442360`, `port` slot of the 6-element address array), so a non-default port works as long as host and client agree on it. Host and join sharing one port variable is the corroboration that the host-side override takes effect - the identical value must reach the socket for a client to dial a non-default server. **[The parse + storage is confirmed statically; end-to-end socket binding at a custom port is not yet verified live.]** See `docs/game-flow.md` § Command-line arguments.
+
+The GameSpy **query port `4711` is not configurable.** It is a compile-time literal `0x1267` passed as the first argument to GameSpy init (`FUN_004240d0(0x1267, "cneagle", …)` @ `0x4240d0`), which binds the query socket to it and emits it as the `<queryport>` in the `\heartbeat\` frame (§1a). No flag, config file, or global feeds it - there is a single call site with the value inlined, so changing it requires patching the binary.
 
 ---
 
