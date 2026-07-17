@@ -18,9 +18,13 @@ import type {GameServerStatus, LanBeacon, LanServer} from './types.ts'
  * broadcasts to UDP `:210` about once a second.
  *
  * Layout (see `docs/network.md` §3): byte 0 is `0x44` (`'D'`), byte 12 is
- * `numPlayers + 1`, byte 13 is `maxPlayers + 1`, and the server name is
- * NUL-terminated from byte 14 (falling back to the packet end if unterminated).
- * The beacon carries no IP - callers supply the datagram's source address.
+ * `numPlayers + 1` (connected remote clients - a listen server's own host-player
+ * is not counted, so this can read below GameSpy `numplayers`), byte 13 is
+ * `maxPlayers + 1` **clamped to 16** (so `maxPlayers` is exact only for ≤15-slot
+ * hosts and reports 15 for anything larger - the real value comes from a GameSpy
+ * `\status\` query), and the server name is NUL-terminated from byte 14 (falling
+ * back to the packet end if unterminated). The beacon carries no IP - callers
+ * supply the datagram's source address.
  *
  * @param datagram - The received beacon bytes.
  * @returns The parsed beacon, or `null` if it is not a `'D'` beacon.

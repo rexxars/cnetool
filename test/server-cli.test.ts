@@ -37,21 +37,26 @@ describe('parseAddress', () => {
 
 describe('formatServerTable', () => {
   test('renders a header + aligned rows, LAN and internet', () => {
+    // A beacon-fallback LAN host: answered the beacon but not the \status\
+    // query, so it has no version, map, or ping.
     const lan: GameServerStatus = {
       ...base,
       ip: '192.168.1.5',
       name: 'LOCALDEV',
+      version: '',
       map: '',
       ping: undefined,
       source: 'lan',
     }
     const table = formatServerTable([lan, base])
     const lines = table.trimEnd().split('\n')
-    expect(lines[0]).toMatch(/^SRC\s+PING\s+PLAYERS\s+MAP\s+NAME\s+ADDRESS$/)
+    expect(lines[0]).toMatch(/^SRC\s+VER\s+PING\s+PLAYERS\s+MAP\s+NAME\s+ADDRESS$/)
     expect(lines[1]).toContain('LAN')
-    expect(lines[1]).toContain('192.168.1.5:4711')
+    expect(lines[1]).toContain('192.168.1.5:24711') // game port, not query port
+    expect(lines[1]).toContain('?') // unknown version (beacon fallback)
     expect(lines[1]).toContain('-') // blank map + unpinged shown as '-'
     expect(lines[2]).toContain('NET')
+    expect(lines[2]).toContain('1.43') // version column
     expect(lines[2]).toContain('42ms')
   })
 
@@ -68,7 +73,9 @@ describe('formatStatus', () => {
     }
     const text = formatStatus(server)
     expect(text).toContain('Name:      CE Nation')
-    expect(text).toContain('Game type: ctf (teamplay)')
+    expect(text).toContain('Address:   89.38.98.12:24711') // game port, no query port
+    expect(text).toContain('Version:   1.43') // bare version, no cneagle prefix
+    expect(text).toContain('Game type: ctf')
     expect(text).toMatch(/PLAYER\s+TEAM\s+FRAGS\s+DEATHS\s+PING/)
     expect(text).toContain('Rexxie')
   })

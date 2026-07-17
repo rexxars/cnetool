@@ -184,13 +184,16 @@ export function formatServerTable(servers: GameServerStatus[]): string {
   }
   const rows = servers.map((server) => [
     server.source === 'lan' ? 'LAN' : 'NET',
+    // '?' = unknown: a LAN host that answered its beacon but not the \status\
+    // query (the beacon carries no version). A queried host has a real version.
+    server.version || '?',
     server.ping === undefined ? '-' : `${server.ping}ms`,
     `${server.numPlayers}/${server.maxPlayers}`,
     server.map || '-',
     server.name || '(unnamed)',
-    `${server.ip}:${server.queryPort}`,
+    `${server.ip}:${server.gamePort}`,
   ])
-  const header = ['SRC', 'PING', 'PLAYERS', 'MAP', 'NAME', 'ADDRESS']
+  const header = ['SRC', 'VER', 'PING', 'PLAYERS', 'MAP', 'NAME', 'ADDRESS']
   const widths = header.map((label, column) =>
     Math.max(label.length, ...rows.map((row) => row[column]!.length)),
   )
@@ -206,10 +209,10 @@ export function formatServerTable(servers: GameServerStatus[]): string {
 export function formatStatus(server: GameServerStatus | GameServer): string {
   const lines = [
     `Name:      ${server.name || '(unnamed)'}`,
-    `Address:   ${server.ip}:${server.queryPort} (game port ${server.gamePort})`,
-    `Version:   ${server.version ? `cneagle ${server.version}` : 'unknown'}`,
+    `Address:   ${server.ip}:${server.gamePort}`,
+    `Version:   ${server.version || 'unknown'}`,
     `Map:       ${server.map || '-'}`,
-    `Game type: ${server.gameType || '-'}${server.teamplay ? ' (teamplay)' : ''}`,
+    `Game type: ${server.gameType || '-'}`,
     `Players:   ${server.numPlayers}/${server.maxPlayers}`,
     `Limits:    frag ${limit(server.fragLimit)}, score ${limit(server.scoreLimit)}, time ${
       server.timeLimit === 0 ? 'off' : `${server.timeLimit} min`

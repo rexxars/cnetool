@@ -12,14 +12,14 @@ Each section flags confidence: **[Confirmed]** = verified by static analysis or 
 
 ## Ports at a glance
 
-| Port    | Proto | Role                                                                                               | Confidence                           |
-| ------- | ----- | -------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| Port    | Proto | Role                                                                                                                                                                               | Confidence                           |
+| ------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
 | `24711` | UDP   | Game/session traffic (DirectPlay). Default host/connect port, overridable via `+host <port>` / `+connect ip:port`. Also where a _modern_ server's "type-3" status responder lives. | Confirmed                            |
-| `4711`  | UDP   | GameSpy query port - where a server answers `\status\`-style queries.                              | Confirmed (live probe)               |
-| `27900` | UDP   | GameSpy master heartbeat port - where the server announces itself to the master (send-only).       | Confirmed (ce.exe uses `SOCK_DGRAM`) |
-| `210`   | UDP   | `iplist.exe` **local bind/source** port for its probes - and where a host's LAN beacon is sent.    | Confirmed                            |
-| `211`   | UDP   | `iplist.exe` legacy query **destination** port (`'B'`/`'G'` messages).                             | Confirmed                            |
-| `47624` | UDP   | Classic DirectPlay session enumeration (standard DPlay). CE's actual use here is unverified.       | Unconfirmed                          |
+| `4711`  | UDP   | GameSpy query port - where a server answers `\status\`-style queries.                                                                                                              | Confirmed (live probe)               |
+| `27900` | UDP   | GameSpy master heartbeat port - where the server announces itself to the master (send-only).                                                                                       | Confirmed (ce.exe uses `SOCK_DGRAM`) |
+| `210`   | UDP   | `iplist.exe` **local bind/source** port for its probes - and where a host's LAN beacon is sent.                                                                                    | Confirmed                            |
+| `211`   | UDP   | `iplist.exe` legacy query **destination** port (`'B'`/`'G'` messages).                                                                                                             | Confirmed                            |
+| `47624` | UDP   | Classic DirectPlay session enumeration (standard DPlay). CE's actual use here is unverified.                                                                                       | Unconfirmed                          |
 
 > Note: `24711` is the **default** game/session port, not a fixed one — it is overridable at launch (see below). `4711` is the GameSpy query port and **is** fixed (hardcoded). The other ports were recovered by reverse engineering and packet capture.
 
@@ -72,7 +72,7 @@ The master can then run a **`\secure\` / `\validate\` challenge-response** to pr
 1. Master sends `\secure\<challenge>` to the server's query port `4711` (challenge = random alphanumeric string; may be appended to a `\status\` / `\basic\` query).
 2. Server appends `\validate\<response>` to its reply, where `response = base64( gs_encrypt(challenge, secretKey) )`.
 
-**[Confirmed - live probe]** `\secure\ABCDEF` → the live 1.43 host returned `\validate\XY7mYbEq\final\`, matching `computeValidate('ABCDEF')` - so the key and transform below are correct against a real server.
+**[Confirmed - live probe]** `\secure\ABCDEF` → `\validate\XY7mYbEq\final\`, matching `computeValidate('ABCDEF')` - confirmed against both a **1.43** host and a **1.50** dedicated, so the key `HNvEAc` and transform below are unchanged across those versions.
 
 The CE specifics (reverse-engineered from `ce.exe`):
 
@@ -232,7 +232,7 @@ The first byte of the 8-byte datagram and the destination port depend on the `mo
 
 ### Version timeline - two `iplist.exe` builds **[Confirmed]**
 
-There are exactly **two** distinct `IPLIST.EXE` binaries across all versions examined (both happen to be 196,665 bytes, but ~74% of their bytes differ - a full rebuild, not a tweak):
+There are exactly **two** distinct `IPLIST.EXE` binaries across all pre-1.50 versions examined (both happen to be 196,665 bytes, but ~74% of their bytes differ - a full rebuild, not a tweak):
 
 | Build (md5) | Ships in                                 | Probe model                                                 |
 | ----------- | ---------------------------------------- | ----------------------------------------------------------- |
@@ -257,38 +257,78 @@ Both halves were captured live (`.33` client ↔ `.35` host `CE Nation`).
 
 Live capture refines the static reading: byte 5 is a **non-zero token** that varies per probe (`0x5b`, `0x69`), not "all rest zero". The reply does **not** echo it.
 
-**Reply** - ~59-byte datagram, unicast back to the prober's source port `210`:
+**Reply** - 59-byte datagram, unicast back to the prober's source port. Field
+meanings below are pinned by live probes of **three hosts**: a 1.50 dedicated
+(`CE Dedicated`, deathmatch, `maxplayers` 15, 0 players), a non-dedicated LAN
+host (`LOCALDEV`, ctf, `maxplayers` 16, host playing), and an internet host
+(`CE2022`, ctf, `maxplayers` 28). Example is the `CE Dedicated` reply:
 
 ```
-03 00 00 00 00 24 00 33  00 00 00 00 87 60 ff 01  01 09 "CE Nation\0"  <tail>
+03 00 00 00 00 5a 00 33  00 00 00 00 87 60 ff 00  01 10 "CE Dedicated\0"  <tail>
 ```
 
-| Offset | Bytes         | Field                                                      | Confidence  |
-| ------ | ------------- | ---------------------------------------------------------- | ----------- |
-| 0      | `03`          | echoes the query type                                      | Confirmed   |
-| 5      | `24`          | unknown counter - `+1` per player in samples, but see note | Unconfirmed |
-| 7      | `33`          | marker the client validates                                | Confirmed   |
-| 8-11   | `00 00 00 00` | **zeroed IP field** (querier fills in the probed IP)       | Confirmed   |
-| 12-13  | `87 60`       | game port, little-endian `0x6087` = `24711`                | Confirmed   |
-| 16     | `01`          | **player count + 1** (`01` idle → `02` with 1 player)      | Confirmed   |
-| 17-18  | `09 43…`      | server name, length-prefixed (`09`) + NUL (`CE Nation`)    | Confirmed   |
-| 28+    | `<tail>`      | **leaked uninitialized memory** - see note                 | Confirmed   |
+| Offset | Bytes         | Field                                                                        | Confidence  |
+| ------ | ------------- | ---------------------------------------------------------------------------- | ----------- |
+| 0      | `03`          | echoes the query type                                                        | Confirmed   |
+| 5      | `5a`          | per-session counter; **+1 per remote-client join**, not per-query (see note) | Confirmed   |
+| 7      | `33`          | marker the client validates                                                  | Confirmed   |
+| 8-11   | `00 00 00 00` | **zeroed IP field** (querier fills in the probed IP)                         | Confirmed   |
+| 12-13  | `87 60`       | game port, little-endian `0x6087` = `24711`                                  | Confirmed   |
+| 14     | `ff`          | constant `0xff` (unknown)                                                    | Unconfirmed |
+| 15     | `00`          | **teamplay flag** (`00` off / `01` on)                                       | Confirmed   |
+| 16     | `01`          | **connected-client count + 1** (see note - host player not counted)          | Confirmed   |
+| 17     | `10`          | **`maxplayers + 1`, saturating at 16** (`0x10`) - see note                   | Confirmed   |
+| 18+    | `43…00`       | server name, **NUL-terminated** (`CE Dedicated`)                             | Confirmed   |
+| tail   | `<tail>`      | **leaked uninitialized memory** - see note                                   | Confirmed   |
 
-> **The reply carries the server's _port_ but a zeroed _IP_ field.** The querier is expected to fill in the IP it just probed. A parser that takes the IP straight from the packet will show `0.0.0.0`.
+> **Offset 15 = teamplay.** `00` for the deathmatch host, `01` for both ctf
+> hosts - it tracks the GameSpy `teamplay` field exactly. This is the byte the
+> beacon carries at offset 11 (the `ff 01` / `ff 00` pair is `[0xff][teamplay]`).
 >
-> **Player count is at offset 16, not in the tail.** A live probe with one player connected showed offset 16 = `02` (vs `01` idle) - i.e. `numplayers + 1`, matching the beacon (§3). The query token is **not** echoed (reply offset 5 was `25` for a query whose offset-5 token was `42`).
+> **Offset 17 is `maxplayers + 1` clamped to 16.** It read `0x10` on the
+> `maxplayers` 15 / 16 / 28 hosts and `0x09` on the historical 8-slot `CE
+Nation` capture - i.e. `min(maxplayers, 15) + 1`, saturating at `0x10`. So it
+> is a usable max only for ≤15-slot servers; above that it pins at 16. Read the
+> real `maxplayers` from GameSpy `\status\` (the demo/patch allows up to 30).
 >
-> **Caveat on the tail (offset 28+).** The bytes after the name are **not** reliable map/maxplayers values. They decode to heap-pointer-shaped junk (`…28 06 4e 02 48 f8…` ≈ `0x024e0628`) and the _identical_ tail reappears in the DirectPlay connect reply (§4) - i.e. the host emits a fixed-size struct and leaks whatever was in the buffer. `maxplayers`, `mapname`, etc. are better read from the GameSpy `\status\` reply (§1b).
+> **Offset 16 counts _remote clients_, not total players.** Confirmed on two
+> hosts: connecting a client to the dedicated host moved it `01` → `02`, and the
+> `LOCALDEV` listen server with its host **plus** one joined client read `02`
+> while `\status\` reported `numplayers 2` - so exactly the one remote client is
+> counted and the host-player is not. So this byte (and the beacon's offset 12) =
+> _remote clients + 1_, and reads lower than GameSpy `numplayers` on a listen
+> server whose host is playing.
 >
-> **Offset 5 oddity.** Offset 5 also rose by 1 between the idle (`24`) and 1-player (`25`) samples, but the **beacon's** analogous byte does _not_ move with players (§3), so offset 5 is more likely a counter/checksum than a second player field. Needs more samples (2+ players) to settle.
+> **The reply carries the server's _port_ but a zeroed _IP_ field.** The querier
+> fills in the IP it just probed; a parser that takes the IP from the packet
+> gets `0.0.0.0`.
+>
+> **The tail is leaked memory.** The bytes after the name decode to
+> pointer-shaped junk that differs per host: `CE Dedicated` leaks ce.exe code/data
+> addresses (`9c 34 42 00` = `0x0042349c`, `48 f7 52 00` = `0x0052f748`),
+> `CE2022` leaks a stack address (`08 f8 19 00` = `0x0019f808`). The host emits a
+> fixed-size struct and never zeroes the slack. No real `map`/`maxplayers`
+> fields live there - read those from GameSpy `\status\` (§1b).
+>
+> **Offset 5 is a per-session counter that bumps on player join.** It is _not_
+> per-query (back-to-back probes return the same value) and does not echo the
+> query token. A remote client joining moved it `0x5a` → `0x5b` on the dedicated
+> host and `0x09` → `0x0a` on the `LOCALDEV` listen server - +1 per join on two
+> independent hosts, tracking the offset-16 client byte - and a 1999 note saw the
+> same `24` → `25`. Its per-host baseline differs (`0x5a` / `0x09` / `0xf9`), so
+> it carries session history, not just the current count. A content-checksum was
+> ruled out: no byte-sum window over the record reproduces all three baselines.
+> Best read as a **state-change / event counter** (the same class of event that
+> triggers a GameSpy `\statechanged\` heartbeat), seeded by the session's earlier
+> activity; the exact set of triggering events (leaves, map loads, …) is unpinned.
 
-This reply is structurally **the same record as the LAN beacon** (§3): the beacon is this reply minus the 4-byte IP field. See the beacon section for the side-by-side.
+This reply is structurally **the same record as the LAN beacon** (§3): the beacon is this reply minus the 4-byte IP field, and every field from the port onward (teamplay, client count, clamped max, NUL-terminated name) matches. See the beacon section for the side-by-side.
 
 ### Why the in-game browser finds no internet servers (stock) **[Confirmed]**
 
 The default menu path spawns `iplist.exe` in **mode 1**, which probes with the **legacy `'B'`/`'G'` messages on port `211`**. Servers in the modern lineage do **not** answer that protocol. The protocol they _do_ answer - **type-3 on `24711`** - is reachable only via mode 2, which the stock menu never invokes (and which was additionally hampered by the port-truncation quirk above). So out of the box the internet browser stays empty even when `iplist.txt` points at a live, joinable server.
 
-A live community-run server **does** answer the type-3/`24711` query - so routing the browser through that path makes internet servers appear. Whether the type-3 responder is part of the stock host or an addition on those particular servers is noted under Open Questions.
+A live community-run server **does** answer the type-3/`24711` query - so routing the browser through that path makes internet servers appear. Three live hosts across the modern lineage answer it (a 1.50 dedicated, a `1.43`-reporting LAN host, and a community internet host), so the responder is part of that lineage; whether a truly stock, unpatched 1.41 host answers is untested (no such host available) and remains under Open Questions.
 
 ---
 
@@ -315,25 +355,33 @@ An **idle dedicated host broadcasts an announcement once per second**, from the 
 
 Because `iplist.exe` already **binds `210`** (it sends its probes _from_ there), a listener on `210` receives these beacons without ever sending a probe. So LAN discovery is **push-based**: the host advertises; iplist/the game just listens.
 
-The payload is **24 bytes**:
+The payload is **`14 + name_len + 1` bytes** (24 for the 9-char `CE Nation`):
 
 ```
 44 00 00 00  00 04 00 10  87 60 ff 01  01 09  43 45 20 4e 61 74 69 6f 6e 00
 ```
 
-| Offset | Bytes      | Field                                                 | Confidence  |
-| ------ | ---------- | ----------------------------------------------------- | ----------- |
-| 0      | `44`       | message type **`'D'`** (0x44)                         | Confirmed   |
-| 1-3    | `00 00 00` | padding / reserved                                    | Inferred    |
-| 4-6    | `00 04 00` | unknown - constant in samples                         | Unconfirmed |
-| 7      | `10`       | **`name_len + 7`** (`0x10` = 16 → a 9-char name)      | Confirmed   |
-| 8-9    | `87 60`    | game port, little-endian `0x6087` = `24711`           | Confirmed   |
-| 10-11  | `ff 01`    | unknown (flags?)                                      | Unconfirmed |
-| 12     | `01`       | **player count + 1** (`01` idle → `02` with 1 player) | Confirmed   |
-| 13     | `09`       | **max players + 1** (`09` → 8 slots)                  | Confirmed   |
-| 14-23  | `43…6e 00` | server name, **NUL-terminated** (e.g. `CE Nation`)    | Confirmed   |
+| Offset | Bytes      | Field                                                              | Confidence  |
+| ------ | ---------- | ------------------------------------------------------------------ | ----------- |
+| 0      | `44`       | message type **`'D'`** (0x44)                                      | Confirmed   |
+| 1-4    | `00…00`    | reserved (always zero)                                             | Inferred    |
+| 5      | `04`       | **≈ maxplayers / 2** (⌊clamped max ÷ 2⌋); config-derived, not live | Inferred    |
+| 6      | `00`       | reserved (always zero)                                             | Inferred    |
+| 7      | `10`       | **`name_len + 7`** (`0x10` = 16 → a 9-char name)                   | Confirmed   |
+| 8-9    | `87 60`    | game port, little-endian `0x6087` = `24711`                        | Confirmed   |
+| 10     | `ff`       | constant `0xff` (unknown)                                          | Unconfirmed |
+| 11     | `01`       | **teamplay flag** (`00` off / `01` on)                             | Confirmed   |
+| 12     | `01`       | **connected-client count + 1** (remote clients; host not counted)  | Confirmed   |
+| 13     | `09`       | **`max players + 1`, saturating at 16** (`0x09` → 8 slots)         | Confirmed   |
+| 14+    | `43…6e 00` | server name, **NUL-terminated** (e.g. `CE Nation`)                 | Confirmed   |
 
 > **Offsets 7 and 13 (patch RE + multi-sample capture).** The `CE Nation` sample above hides the distinction between offset 7, offset 13, and the name length: the name is **9 chars** and the host has **8** max players, so offset 13 (`maxplayers+1 = 9`) equals the name length, and offset 7 (`name_len+7 = 16`) blends into the `00 04 00 10` run. A longer sample separates them - `CodenameEagle.net US West` (25 chars, 8 max players) sends **offset 7 = `0x20` (32 = 25+7)** and **offset 13 = `0x09` (8 max players)**, with the name running 25 bytes to its NUL. So the name is delimited by its **NUL terminator** (offset 7 corroborates the length), **not** by a byte-13 length prefix - reading byte 13 as the length truncates long names and drops beacons whose `maxplayers` runs past the packet end. `parseBeacon` in `src/api/lan.ts` implements this; `test/lan.test.ts` carries both captured beacons.
+
+> **Byte 13 saturates at 16 (`0x10`).** Live type-3 probes (§2, the same field) read `0x10` for hosts with `maxplayers` 15, 16 and 28, and `0x09` for an 8-slot host - i.e. `min(maxplayers, 15) + 1`. So `parseBeacon`'s `maxPlayers` is exact only for ≤15-slot servers and reports 15 for anything larger; the true value comes from GameSpy `\status\`. `parseBeacon` is a fallback for hosts that don't answer `\status\`, so this is acceptable but worth knowing.
+
+> **Byte 11 = teamplay, byte 12 = clients+1 - confirmed live on the wire.** In one `:210` capture of the `LOCALDEV` ctf host, byte 12 flipped `01` → `02` mid-stream the moment a remote client joined (the beacon is rebuilt from live state each ~1 s), while byte 11 stayed `01` (teamplay on). So byte 12 counts _remote clients + 1_ - the host-player is not included - and byte 11 is teamplay. The `ff 01` pair is `[0xff constant][teamplay]`. This matches the three-host type-3 capture (§2).
+
+> **Byte 5 ≈ maxplayers / 2, and does not track live state.** Across the captured beacons it fits `⌊min(maxplayers, 15) / 2⌋`: the 8-slot `CodenameEagle.net US West` sent `0x04`, and `LOCALDEV` (15/16 slots, clamped to 15) sent `0x07`. In the same live capture where byte 12 flipped on a join, byte 5 held `0x07` throughout - so it is derived from the configured max, not live state (unlike the type-3 offset-5 join counter, §2, a different field). Only two distinct maxplayers have been sampled, so this is provisional - a host with a different max (e.g. 4 or 6) would confirm it. Bytes 1-4 and 6 are reserved (always zero).
 
 > Note the game port is embedded **little-endian** in the payload (`87 60`), whereas it appears network-order (`60 87`) in the UDP header. Unlike the type-3 reply, the beacon carries no IP field at all - the receiver uses the source IP of the datagram.
 
@@ -347,11 +395,11 @@ reply  (59B):  03 00 00 00 00 24 00 33  00 00 00 00 87 60 ff 01 01 09 "CE Nation
 
 By analogy with the beacon, the reply's offset-17 byte (`09` above, the beacon's offset 13) is most likely **max players + 1** and the name is NUL-terminated from offset 18 - though only the beacon side is cross-checked against multiple captures.
 
-**The beacon is continuous, and offset 12 tracks player count.** Across a ~14-min capture the host emitted **835 beacons at ~1.0 s**, never pausing for the active session. Byte 12 split exactly **571× `01` (idle) / 264× `02`**, and the 264 `02` beacons fall precisely inside the connected player's session window - so **offset 12 = `numplayers + 1`**. Everything else in the payload (including the still-unknown bytes 4-6 and 10-11) stayed constant - the same-name capture holds offset 7 constant too, but it tracks name length across differently-named hosts (see the offset table).
+**The beacon is continuous, and offset 12 tracks the client count.** Across a ~14-min capture the host emitted **835 beacons at ~1.0 s**, never pausing for the active session. Byte 12 split exactly **571× `01` (idle) / 264× `02`**, and the 264 `02` beacons fall precisely inside the connected player's session window - so **offset 12 = connected clients + 1** (a remote joiner; see §2 for why a listen server's own host-player is not counted). The remaining constant bytes are 4-6 and the `0xff` at offset 10; offset 11 is teamplay and offset 13 is the clamped max (offset table above).
 
 > Caveat: in one captured session the beacon _appeared_ to never change with players, but that session was logged `nPlayers=0` on the console (a failed/odd join), so the count genuinely stayed at `01`. With a real connected player it flips to `02`, confirming offset 12.
 >
-> Bytes 4-6 and 10-11 are still unexplained; they did not move between idle and 1-player. Need 2+ players / varied map to probe them further. (Offset 7 is `name_len + 7`; offset 13 is `maxplayers + 1`.)
+> Bytes 4-6 and the `0xff` at offset 10 are still unexplained; they did not move between idle and 1-player. (Offset 7 is `name_len + 7`; offset 11 is teamplay; offset 12 is clients+1; offset 13 is `maxplayers + 1` clamped to 16.)
 
 ### Practical consequence for modding
 
@@ -534,10 +582,10 @@ Anyone rebuilding a spectator or replay client from these packets needs to repro
 
 ## Open questions
 
-- **LAN beacon / type-3 unknown bytes.** Beacon bytes 4-7 and 10-11 (and the type-3 offset-5 counter) did not move between idle and 1 player. Unverified (captures with 2+ players, a varied map, and a different server-name length would settle this): what these bytes encode.
+- **Remaining beacon/type-3 unknown bytes.** After the live captures the only fully-unexplained byte is the constant **`0xff`** at beacon offset 10 / type-3 offset 14. Two items are provisional: **beacon offset 5** (fits `⌊maxplayers/2⌋` on two hosts - confirm with a third max value like 4 or 6), and the **exact trigger set for the type-3 offset-5 counter** (confirmed to bump on join and carry a per-session baseline; whether leaves / map loads also bump it is untested). (Resolved: beacon offset 5 ≈ maxplayers/2, type-3 offset 5 = per-session join counter, offset 11 = teamplay, offset 12/16 = remote clients + 1, offset 13/17 = maxplayers+1 clamped to 16, offset 7 = name_len+7.)
 - **Does the in-game browser actually consume the `'D'`/210 beacon?** The host is confirmed to broadcast it and iplist binds `210`; whether the receive side surfaces it in the browser is unverified (as is whether GameSpy-on-`4711` / DirectPlay enumeration still play any LAN role).
-- **Type-3 responder origin.** Whether the `0x03`/`24711` status responder is in the stock host code or specific to certain live servers.
+- **Type-3 responder origin - narrowed.** All three live hosts (a 1.50 dedicated, a `1.43`-reporting LAN host, a community internet host) answer `0x03`/`24711`, so the responder is part of the modern/patched lineage. Whether a **truly stock, unpatched 1.41** host answers is still untested (no such host available).
 - **Join opcodes `0x01` / `0x3d` / `0x17`.** From one captured session (§4). Unverified: the full handshake order, what `0x01`'s `val` field means, the meaning of the trailing `0x02` after the registered name, and how a clean leave/timeout is signalled (none was distinctly captured - the host just resumed beaconing).
-- **Type-3 / connect-reply leaked tail.** The bytes after the name (offset 28+ in the type-3 reply, and after the map name in the `0x3d` reply) look like uninitialized memory. Unverified (a capture of a populated server would settle this): whether real map/player/maxplayers fields live there or elsewhere.
+- **Type-3 tail - resolved (leaked memory).** Live probes of three hosts show the bytes after the name are uninitialized: `CE Dedicated` leaks ce.exe code/data pointers (`0x0042349c`, `0x0052f748`), `CE2022` a stack pointer (`0x0019f808`); they differ per host and carry no real fields. Read map/maxplayers from GameSpy `\status\`. (The `0x3d` connect-reply tail in §4 is the same pattern; a populated-server capture could still confirm whether _that_ reply hides fields.)
 - **Mode `4711` (`0x1267`) branch in `iplist.exe`.** Why it keys on the value `4711` and what it's meant to query.
 - **IPX path.** The IPX discovery code exists but was not analysed; presumed legacy/dead.

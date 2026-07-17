@@ -425,9 +425,16 @@ export interface GamePlayer {
 export interface LanBeacon {
   /** Server name (NUL-terminated, from offset 14). */
   name: string
-  /** Players currently connected (beacon byte 12 minus one). */
+  /**
+   * Connected remote clients (beacon byte 12 minus one). A listen server's own
+   * host-player is not counted, so this can read below GameSpy `numplayers`.
+   */
   numPlayers: number
-  /** Maximum player slots (beacon byte 13 minus one). */
+  /**
+   * Maximum player slots (beacon byte 13 minus one). The beacon field saturates
+   * at 16, so this is exact only for hosts with ≤15 slots and reports 15 for
+   * anything larger; the true value comes from a GameSpy `\status\` query.
+   */
   maxPlayers: number
 }
 
