@@ -310,20 +310,23 @@ The payload is **24 bytes**:
 44 00 00 00  00 04 00 10  87 60 ff 01  01 09  43 45 20 4e 61 74 69 6f 6e 00
 ```
 
-| Offset | Bytes         | Field                                                 | Confidence  |
-| ------ | ------------- | ----------------------------------------------------- | ----------- |
-| 0      | `44`          | message type **`'D'`** (0x44)                         | Confirmed   |
-| 1-3    | `00 00 00`    | padding / reserved                                    | Inferred    |
-| 4-7    | `00 04 00 10` | unknown - **constant** regardless of players          | Unconfirmed |
-| 8-9    | `87 60`       | game port, little-endian `0x6087` = `24711`           | Confirmed   |
-| 10-11  | `ff 01`       | unknown (flags / max-players?)                        | Unconfirmed |
-| 12     | `01`          | **player count + 1** (`01` idle → `02` with 1 player) | Confirmed   |
-| 13     | `09`          | server-name length (= 9)                              | Confirmed   |
-| 14-23  | `43…6e 00`    | server name, length-prefixed + NUL (e.g. `CE Nation`) | Confirmed   |
+| Offset | Bytes      | Field                                                 | Confidence  |
+| ------ | ---------- | ----------------------------------------------------- | ----------- |
+| 0      | `44`       | message type **`'D'`** (0x44)                         | Confirmed   |
+| 1-3    | `00 00 00` | padding / reserved                                    | Inferred    |
+| 4-6    | `00 04 00` | unknown - constant in samples                         | Unconfirmed |
+| 7      | `10`       | **`name_len + 7`** (`0x10` = 16 → a 9-char name)      | Confirmed   |
+| 8-9    | `87 60`    | game port, little-endian `0x6087` = `24711`           | Confirmed   |
+| 10-11  | `ff 01`    | unknown (flags?)                                      | Unconfirmed |
+| 12     | `01`       | **player count + 1** (`01` idle → `02` with 1 player) | Confirmed   |
+| 13     | `09`       | **max players + 1** (`09` → 8 slots)                  | Confirmed   |
+| 14-23  | `43…6e 00` | server name, **NUL-terminated** (e.g. `CE Nation`)    | Confirmed   |
+
+> **Offsets 7 and 13 (patch RE + multi-sample capture).** The `CE Nation` sample above hides the distinction between offset 7, offset 13, and the name length: the name is **9 chars** and the host has **8** max players, so offset 13 (`maxplayers+1 = 9`) equals the name length, and offset 7 (`name_len+7 = 16`) blends into the `00 04 00 10` run. A longer sample separates them - `CodenameEagle.net US West` (25 chars, 8 max players) sends **offset 7 = `0x20` (32 = 25+7)** and **offset 13 = `0x09` (8 max players)**, with the name running 25 bytes to its NUL. So the name is delimited by its **NUL terminator** (offset 7 corroborates the length), **not** by a byte-13 length prefix - reading byte 13 as the length truncates long names and drops beacons whose `maxplayers` runs past the packet end. `parseBeacon` in `src/api/lan.ts` implements this; `test/lan.test.ts` carries both captured beacons.
 
 > Note the game port is embedded **little-endian** in the payload (`87 60`), whereas it appears network-order (`60 87`) in the UDP header. Unlike the type-3 reply, the beacon carries no IP field at all - the receiver uses the source IP of the datagram.
 
-**Same record as the type-3 reply.** The beacon is the §2 type-3 status reply with the 4-byte IP field removed; everything from the port onward is identical:
+**Same record as the type-3 reply, from the port onward.** The beacon is close to the §2 type-3 status reply with the 4-byte IP field removed - the game port, the `ff 01`, the player-count byte, the max-players byte and the NUL-terminated name line up. The two differ in the header bytes at offsets 5 and 7: in the beacon offset 7 is `name_len + 7`, whereas in the reply it is a fixed marker (`0x33`) the client validates.
 
 ```
 beacon (24B):  44 00 00 00 00 04 00 10            87 60 ff 01 01 09 "CE Nation\0"
@@ -331,11 +334,13 @@ reply  (59B):  03 00 00 00 00 24 00 33  00 00 00 00 87 60 ff 01 01 09 "CE Nation
                                         └ zeroed IP ┘
 ```
 
-**The beacon is continuous, and offset 12 tracks player count.** Across a ~14-min capture the host emitted **835 beacons at ~1.0 s**, never pausing for the active session. Byte 12 split exactly **571× `01` (idle) / 264× `02`**, and the 264 `02` beacons fall precisely inside the connected player's session window - so **offset 12 = `numplayers + 1`**. Everything else in the payload (including the still-unknown bytes 4-7 and 10-11) stayed constant.
+By analogy with the beacon, the reply's offset-17 byte (`09` above, the beacon's offset 13) is most likely **max players + 1** and the name is NUL-terminated from offset 18 - though only the beacon side is cross-checked against multiple captures.
+
+**The beacon is continuous, and offset 12 tracks player count.** Across a ~14-min capture the host emitted **835 beacons at ~1.0 s**, never pausing for the active session. Byte 12 split exactly **571× `01` (idle) / 264× `02`**, and the 264 `02` beacons fall precisely inside the connected player's session window - so **offset 12 = `numplayers + 1`**. Everything else in the payload (including the still-unknown bytes 4-6 and 10-11) stayed constant - the same-name capture holds offset 7 constant too, but it tracks name length across differently-named hosts (see the offset table).
 
 > Caveat: in one captured session the beacon _appeared_ to never change with players, but that session was logged `nPlayers=0` on the console (a failed/odd join), so the count genuinely stayed at `01`. With a real connected player it flips to `02`, confirming offset 12.
 >
-> Bytes 4-7 and 10-11 are still unexplained; they did not move between idle and 1-player. Need 2+ players / varied map to probe them further.
+> Bytes 4-6 and 10-11 are still unexplained; they did not move between idle and 1-player. Need 2+ players / varied map to probe them further. (Offset 7 is `name_len + 7`; offset 13 is `maxplayers + 1`.)
 
 ### Practical consequence for modding
 

@@ -73,6 +73,18 @@ export type {
 } from './mesh.ts'
 export {createTextureResolver, parseObjectTextures} from './objects.ts'
 export type {ResolvedTexture, TextureSkin} from './objects.ts'
+export {fetchIpList, parseIpList} from './iplist.ts'
+export type {FetchIpListOptions} from './iplist.ts'
+export {
+  createReassembler,
+  parsePlayers,
+  parseQueryPacket,
+  parseServerStatus,
+  queryServer,
+} from './gamespy.ts'
+export type {QueryServerOptions} from './gamespy.ts'
+export {discoverLanServers, findServers, parseBeacon} from './lan.ts'
+export type {DiscoverLanOptions, FindServersOptions} from './lan.ts'
 export {parsePlacements, serializePlacements} from './placement.ts'
 export type {SerializePlacementsOptions} from './placement.ts'
 export {decompileScript, disassembleScript, parseScript, selfDestructsAtSpawn} from './script.ts'
@@ -102,6 +114,11 @@ export type {
   DialogueFile,
   ExtractedEntry,
   ExtractedKind,
+  GamePlayer,
+  GameServer,
+  GameServerStatus,
+  LanBeacon,
+  LanServer,
   LevelCall,
   LevelIndexEntry,
   LevelInfo,

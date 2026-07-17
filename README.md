@@ -190,6 +190,29 @@ cnetool servinfo servinfo.dat --frag 25 --nextmap off           # 25 frags, rota
 
 `--nextmap` takes a level number, a map name (resolved case-insensitively against `LEVELS.NFO`, default `./levels.nfo` or `--levels <file>`), or `off`. The map switch is broadcast to clients by name, so numbering can differ between machines as long as the display names match.
 
+### `cnetool server <list|query>`
+
+Discover and query live Codename Eagle multiplayer servers over the network. `server list` fetches the community master list (`https://ceservers.net/iplist.txt`) and, by default, also scans the LAN for beaconing hosts, then queries each for its live status; `server query <ip[:port]>` reports one server's status and player roster. The list is community-run and best-effort — only servers patched to announce to ceservers.net (or running 1.50+) appear in it. See [`docs/network.md`](./docs/network.md) for the protocols.
+
+```bash
+cnetool server list                        # master list + LAN, live status table
+cnetool server list --no-lan               # internet servers only
+cnetool server list --raw                  # just the addresses, no querying
+cnetool server query 89.38.98.12           # one server, with players
+cnetool server query 89.38.98.12:4711 --json
+```
+
+| Option (`list`)      | Description                                            |
+| -------------------- | ------------------------------------------------------ |
+| `--no-lan`           | Skip the LAN beacon scan (internet servers only).      |
+| `--url <url>`        | Master list URL to fetch (default the community list). |
+| `--lan-timeout <ms>` | LAN beacon listen window (default 1500).               |
+| `--timeout <ms>`     | Per-server query timeout (default 5000).               |
+| `--raw`              | Print the raw address list only (no querying, fast).   |
+| `--json`             | Emit the parsed servers as JSON.                       |
+
+Scanning the LAN binds the privileged UDP port 210, so `server list` may need elevated privileges (or `--no-lan`) on Unix. `server query` takes `--no-players`, `--timeout <ms>`, and `--json`.
+
 ## API usage
 
 Everything the CLI does is available as plain functions that take and return `Uint8Array`s and data structures: only the CLI touches the filesystem, so the API works in Node, browsers and workers alike. The sections below tour the most common operations; the complete reference covering every export is in [`docs/api.md`](./docs/api.md).

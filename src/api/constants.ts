@@ -71,6 +71,36 @@ export const LIGHT_COLOR_OFFSET = 8
 export const LIGHT_POSITION_OFFSET = 11
 
 /**
+ * Network ports for multiplayer discovery / queries (all UDP). See
+ * `docs/network.md` for the full protocol breakdown.
+ */
+/** GameSpy query port - where a server answers `\status\`-style queries. */
+export const GAMESPY_QUERY_PORT = 4711
+/** Game/session (DirectPlay) port a server advertises as `hostport`. */
+export const GAME_PORT = 24711
+/** Port a host broadcasts its `'D'` LAN beacon to (and `iplist` binds). */
+export const LAN_BEACON_PORT = 210
+
+/** The community-run master server list (bare IPv4-per-line, `#` comments). */
+export const IPLIST_URL = 'https://ceservers.net/iplist.txt'
+
+/**
+ * LAN beacon (`'D'` → `:210`) byte layout. The 24-byte payload is the type-3
+ * status reply minus its 4-byte IP field. Confirmed against captured beacons
+ * (incl. a 25-char name that disambiguates offsets 7 and 13). See
+ * `docs/network.md` §3.
+ */
+export const LAN_BEACON_TYPE = 0x44 // 'D'
+/** Server-name length is stored here as `name_len + 7`. */
+export const LAN_BEACON_NAMELEN_OFFSET = 7
+/** Player count is stored here as `numPlayers + 1`. */
+export const LAN_BEACON_PLAYERS_OFFSET = 12
+/** Max-player count is stored here as `maxPlayers + 1`. */
+export const LAN_BEACON_MAXPLAYERS_OFFSET = 13
+/** The NUL-terminated server name starts here. */
+export const LAN_BEACON_NAME_OFFSET = 14
+
+/**
  * Script-VM enums - the symbolic names for the magic-number arguments to the
  * `REF` builtins. Sourced from the original CE script SDK header (`Global.h`,
  * shipped inside `LEVEL133`), cross-checked against the 1.41 engine. See

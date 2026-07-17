@@ -8,6 +8,8 @@ import {parseArchive, extractEntries, parseMesh} from 'cnetool'
 
 The library is pure ESM and operates on bytes and strings: functions take `Uint8Array` (or `string` for text formats) and return `Uint8Array`, strings, or plain objects. There is no file I/O in the API, so it runs unchanged in Node, browsers, and workers; read and write files yourself with `node:fs/promises` (or `fetch` in a browser). The examples below use Node.
 
+The one exception is [server discovery and queries](#server-discovery-and-queries): those functions do network I/O (UDP via `node:dgram`, HTTP via `fetch`) and so are Node-only. Everything else remains byte-oriented.
+
 File formats referenced throughout are documented in [formats.md](./formats.md); the scripting system in [scripts.md](./scripts.md).
 
 ## Contents
@@ -22,6 +24,7 @@ File formats referenced throughout are documented in [formats.md](./formats.md);
 - [Text configs and stat tables](#text-configs-and-stat-tables)
 - [Localization](#localization)
 - [Level metadata and misc binary](#level-metadata-and-misc-binary)
+- [Server discovery and queries](#server-discovery-and-queries)
 - [Exported types](#exported-types)
 
 ## Archives
@@ -532,6 +535,41 @@ Parses `LEVELS.NFO`: the level index, one `Name:<display name> Val:<number>` lin
 
 Serializes a level index back to `LEVELS.NFO` text, one CRLF-terminated `Name:<name> Val:<number>` line per entry. The inverse of `parseLevelIndex`.
 
+## Server discovery and queries
+
+Read the community master list, discover LAN hosts, and query a server's live status over the GameSpy protocol. Unlike the rest of the API these do network I/O and are **Node-only** (UDP via `node:dgram`, HTTP via `fetch`). The wire protocols are documented in [network.md](./network.md); the corresponding CLI is `cnetool server`.
+
+```ts
+import {findServers, queryServer, fetchIpList} from 'cnetool'
+
+const servers = await findServers() // master list + LAN, resolved to live status
+const one = await queryServer('89.38.98.12') // includes the player roster
+```
+
+### `parseIpList(text: string): string[]`
+
+Parses an `IPLIST.TXT`-format list (the game's own file and the community master list share it): one address per line, `#`-comment and blank lines skipped, whitespace and CRLF tolerated. Deduplicates, preserves order, and returns addresses as-is (no liveness check).
+
+### `fetchIpList(url?: string, options?: FetchIpListOptions): Promise<string[]>`
+
+Fetches a master list over HTTPS (default `https://ceservers.net/iplist.txt`) and runs it through `parseIpList`. The community list is best-effort: only servers patched to announce to ceservers.net (or running 1.50+) appear. `FetchIpListOptions` carries an `AbortSignal`.
+
+### `queryServer(ip: string, port?: number, options?: QueryServerOptions): Promise<GameServer | GameServerStatus>`
+
+Queries a server's GameSpy `\status\` (and, unless `includePlayers` is `false`, `\players\`) on its query port (default `4711`), reassembling the multi-packet reply, and returns the parsed status with a measured `ping`. Overloaded on `includePlayers`: the default returns a `GameServer` (with `players`); `{includePlayers: false}` sends only `\status\` and returns a `GameServerStatus` (no `players` field). `QueryServerOptions` also carries `timeout` (ms, default 5000) and an `AbortSignal`.
+
+### `discoverLanServers(options?: DiscoverLanOptions): Promise<LanServer[]>`
+
+Listens for CE `'D'` LAN beacons and returns the hosts that announced themselves, deduplicated by source IP. Push-based: it only listens (no probe sent). `DiscoverLanOptions`: `timeout` (listen window ms, default 1500), `port` (bind port, default `210` — privileged on Unix; override only behind a relay or in tests), and an `AbortSignal`.
+
+### `parseBeacon(datagram: Uint8Array): LanBeacon | null`
+
+Parses one 24-byte `'D'` beacon into `{name, numPlayers, maxPlayers}`, or `null` if it is not a beacon. See the corrected offset table in [network.md §3](./network.md#lan-beacon-d--210-confirmed---live-capture).
+
+### `findServers(options?: FindServersOptions): Promise<GameServerStatus[]>`
+
+The high-level browser: fetches the master list and (unless `lan` is `false`) scans the LAN, merges and deduplicates the two, then queries each host's `\status\` concurrently (counts only, no roster). Mirrors the in-game browser — internet hosts appear only if they answer, LAN hosts fall back to their beacon, and a list-fetch failure yields no internet rows rather than rejecting. `FindServersOptions`: `lan`, `url`, `lanTimeout`, `queryTimeout`, and an `AbortSignal`.
+
 ## Exported types
 
 All types are exported from the package root (`import type {...} from 'cnetool'`).
@@ -605,6 +643,14 @@ All types are exported from the package root (`import type {...} from 'cnetool'`
 - `MapMatrix`: the `MAPMTX.DAT` 3x3 affine (9 row-major `values`).
 - `LightSource`: one `LIGHTS.DAT` record: `id`, `range`, `color`, `position`.
 - `ServerInfo`: the `servinfo.dat` host match settings: `fragLimit`, `scoreLimit`, `timeLimit` (minutes), `nextMap`.
+
+### Server discovery
+
+- `GameServerStatus`: a server's status from a `\status\` query (or beacon fallback): `ip`, `queryPort`, `gamePort`, `name`, `version`, `map`, `gameType`, `numPlayers`, `maxPlayers`, `timeLimit`, `fragLimit`, `scoreLimit`, `teamplay`, optional `ping`, and `source` (`'internet'` | `'lan'`).
+- `GameServer`: a `GameServerStatus` plus the connected-player `players` roster.
+- `GamePlayer`: one player row: `nickname`, `frags`, `deaths`, `skill`, `ping`, `team`.
+- `LanBeacon`: a parsed `'D'` LAN beacon: `name`, `numPlayers`, `maxPlayers`.
+- `LanServer`: a discovered LAN host: `ip` plus its `beacon`.
 
 ### Tab maps
 

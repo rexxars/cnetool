@@ -355,3 +355,86 @@ export interface LevelIndexEntry {
   /** Numeric level id / `LEVEL<n>/` folder number (the `Val:` field). */
   number: number
 }
+
+/**
+ * A Codename Eagle multiplayer server's status, as recovered from a GameSpy
+ * `\status\` query (see {@link queryServer}) or a LAN beacon fallback. This is
+ * the base record without the per-player roster; {@link GameServer} adds
+ * `players`.
+ */
+export interface GameServerStatus {
+  /** Server IPv4 address (dotted quad). */
+  ip: string
+  /** UDP port the GameSpy query was answered on (default `4711`). */
+  queryPort: number
+  /** UDP game/session port the server advertises (`hostport`, usually `24711`). */
+  gamePort: number
+  /** Advertised server name (`hostname`). */
+  name: string
+  /** Game version with the `cneagle` prefix stripped, eg `1.43` (`gamever`). */
+  version: string
+  /** Current map name (`mapname`). */
+  map: string
+  /** Game mode (`gametype`); the stock modes are the three named here. */
+  gameType: 'ctf' | 'deathmatch' | 'teamplay' | (string & {})
+  /** Players currently connected (`numplayers`). */
+  numPlayers: number
+  /** Maximum player slots (`maxplayers`). */
+  maxPlayers: number
+  /** Round time limit in minutes, `0` = no limit (`timelimit`). */
+  timeLimit: number
+  /** Kill limit that ends the round, `0` = no limit (`fraglimit`). */
+  fragLimit: number
+  /** Score limit that ends the round, `0` = no limit (`scorelimit`). */
+  scoreLimit: number
+  /** Whether team play is on (`teamplay`). */
+  teamplay: boolean
+  /** Measured query round-trip in milliseconds, if it was timed. */
+  ping?: number
+  /** Where the server was discovered - the internet list or a LAN beacon. */
+  source: 'internet' | 'lan'
+}
+
+/** A {@link GameServerStatus} including the connected-player roster. */
+export interface GameServer extends GameServerStatus {
+  /** The connected players (empty if none). */
+  players: GamePlayer[]
+}
+
+/** One connected player from a GameSpy `\players\` / `\status\` reply. */
+export interface GamePlayer {
+  /** Player nickname (`player_N`). */
+  nickname: string
+  /** Kills (`frags_N`). */
+  frags: number
+  /** Deaths (`deaths_N`). */
+  deaths: number
+  /** Skill value (`skill_N`); unused by the stock game, usually `0`. */
+  skill: number
+  /** Reported latency in milliseconds (`ping_N`). */
+  ping: number
+  /** Team (`team_N`), eg `red` / `blue`; empty in non-team modes. */
+  team: string
+}
+
+/**
+ * A parsed Codename Eagle LAN beacon - the 24-byte `'D'` announcement a host
+ * broadcasts about once a second to UDP `:210`. The beacon carries no IP; the
+ * receiver uses the datagram's source address (see {@link discoverLanServers}).
+ */
+export interface LanBeacon {
+  /** Server name (NUL-terminated, from offset 14). */
+  name: string
+  /** Players currently connected (beacon byte 12 minus one). */
+  numPlayers: number
+  /** Maximum player slots (beacon byte 13 minus one). */
+  maxPlayers: number
+}
+
+/** A LAN host discovered by {@link discoverLanServers}: its address + beacon. */
+export interface LanServer {
+  /** Source IPv4 address the beacon arrived from (dotted quad). */
+  ip: string
+  /** The parsed beacon payload. */
+  beacon: LanBeacon
+}
