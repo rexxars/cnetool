@@ -2,7 +2,7 @@
 
 [![npm version](https://img.shields.io/npm/v/cnetool.svg?style=flat-square)](https://www.npmjs.com/package/cnetool)
 
-Tools for working with [Codename Eagle](https://en.wikipedia.org/wiki/Codename:_Eagle) game data files. Use it programmatically as a library, or through the `cnetool` command line interface. The library is split into an `api` layer (operates on `Uint8Array`) and a Node.js `cli` layer that wraps it - the CLI is a thin shell around the same API methods you can call yourself.
+Tools for working with [Codename Eagle](https://en.wikipedia.org/wiki/Codename_Eagle) game data files. Use it programmatically as a library, or through the `cnetool` command line interface. The library is split into an `api` layer (operates on `Uint8Array`) and a Node.js `cli` layer that wraps it - the CLI is a thin shell around the same API methods you can call yourself.
 
 It can unpack the game's `.dat` archives (`textures.dat`, `MENU/menupics.dat`, `objects.dat`, …) into their individual entries. Texture entries are rebuilt into standalone TGA files; entries whose payload isn't a known format are written out as their raw stored blobs. The reverse-engineered file format is documented in [`docs/formats.md`](./docs/formats.md).
 
