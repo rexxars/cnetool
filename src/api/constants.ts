@@ -71,6 +71,25 @@ export const LIGHT_COLOR_OFFSET = 8
 export const LIGHT_POSITION_OFFSET = 11
 
 /**
+ * `menuinfo.dat` (the persisted menu profile / options / progress) codec. The
+ * payload is three fixed 272-byte blocks (16-byte tag + 256-byte struct),
+ * zlib-compressed under two layers of a cyclic byte-add cipher whose keys are
+ * developer taunts baked into `ce.exe`. Decode subtracts KEY1 (outer, over the
+ * compressed body) then inflates then subtracts KEY2 (inner, over the payload);
+ * encode is the inverse. See `docs/formats.md`.
+ */
+export const MENUINFO_KEY1 =
+  "You really shouldn't be messing about with this file, you should be playing the game. You will find nothing in here you know ;-)"
+export const MENUINFO_KEY2 =
+  "Didn't you read the first message? I promise there is nothing in here."
+/** One block: 16-byte tag + 256-byte struct. */
+export const MENUINFO_BLOCK_SIZE = 272
+/** Tag length; the struct body starts at this block-relative offset. */
+export const MENUINFO_STRUCT_OFFSET = 16
+/** Decoded payload size: three blocks. */
+export const MENUINFO_PAYLOAD_SIZE = 816
+
+/**
  * Network ports for multiplayer discovery / queries (all UDP). See
  * `docs/network.md` for the full protocol breakdown.
  */

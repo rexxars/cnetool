@@ -348,6 +348,52 @@ export interface ServerInfo {
   nextMap: number
 }
 
+/**
+ * The persisted menu profile / options from `menuinfo.dat` (the `PlayInfo` +
+ * `OptionsMenu` blocks). Numeric fields keep the game's raw byte values; see
+ * `docs/formats.md` for the enums (team, game mode, renderer, language, ...).
+ */
+export interface MenuInfo {
+  /** Last-played level: SP campaign number, or an MP map (`>= 128`). */
+  lastLevel: number
+  /** Whether the last level was a multiplayer map. */
+  multiplayer: boolean
+  /** Max players for a hosted game. */
+  maxPlayers: number
+  /** Network protocol: `1` = TCP/IP, `0` = IPX. */
+  networkProtocol: number
+  /** Last-connected server IPv4, as a dotted-quad string (port is not stored). */
+  serverIp: string
+  /** Host / server name (<= 39 chars). */
+  hostName: string
+  /** Player name (<= 19 chars; the host truncates it to 10 over the wire). */
+  playerName: string
+  /** Game mode: `0` = deathmatch, `1` = ctf, `2` = teamplay. */
+  gameMode: number
+  /** Savegame slot: `0xffff` = none, `0xfffe` = `temp.dat`, `N` = `sg<N>.dat`. */
+  saveSlot: number
+  /** Team: `0` = red, `1` = blue, `2` = auto (a directive; saved files hold 0/1). */
+  team: number
+  /** Sound-effects volume, `0-255`. */
+  soundVolume: number
+  /** Music volume, `0-255`. */
+  musicVolume: number
+  /** Sound channels: `4`, `8`, or `16`. */
+  soundChannels: number
+  /** Detail level: `0` = low, `128` = medium, `255` = max. */
+  detail: number
+  /** Graphic FX level: `0` = none, `128` = medium, `255` = max. */
+  graphicFx: number
+  /** Renderer: `0` = 3dfx/Glide, `1` = Direct3D, `2` = software. */
+  renderer: number
+  /** Display mode (renderer changes rewrite all three). */
+  resolution: {width: number; height: number; depth: number}
+  /** Language: `1` = English, `2` = Spanish, `3` = Italian, `4` = French, `5` = German. */
+  language: number
+  /** In-game subtitles on/off. */
+  subtitles: boolean
+}
+
 /** One line of `LEVELS.NFO`: a level's display name and its numeric id. */
 export interface LevelIndexEntry {
   /** Display name, eg `No mans land` (the `Name:` field). */

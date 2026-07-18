@@ -6,6 +6,7 @@ import {join} from 'node:path'
 import {runConvert} from './cli/convert.ts'
 import {runExtract} from './cli/extract.ts'
 import {runLevel} from './cli/level.ts'
+import {runMenuInfo} from './cli/menuinfo.ts'
 import {runMesh} from './cli/mesh.ts'
 import {runObject} from './cli/object.ts'
 import {runServer} from './cli/server.ts'
@@ -26,6 +27,7 @@ Commands:
   world <data1.bin|World.dat>  Convert placements between data1.bin and World.dat
   convert <file>           Convert a texture between TGA and PNG
   servinfo <servinfo.dat>  Read or edit host multiplayer match settings
+  menuinfo <menuinfo.dat>  Read or edit the persisted menu profile / options
   server <list|query>      Discover servers (master list + LAN) or query one
 
 Run "cnetool <command> --help" for command-specific options.
@@ -58,6 +60,9 @@ async function main(argv: string[]): Promise<void> {
       return
     case 'servinfo':
       await runServinfo(rest)
+      return
+    case 'menuinfo':
+      await runMenuInfo(rest)
       return
     case 'server':
       await runServer(rest)

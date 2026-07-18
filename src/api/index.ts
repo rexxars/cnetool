@@ -101,6 +101,8 @@ export {
 export type {StatField} from './stattable.ts'
 export {buildArchive, buildTextureArchive, parseArchive} from './parse.ts'
 export type {ArchiveInputEntry} from './parse.ts'
+export {decodeMenuInfo, encodeMenuInfo, formatMenuInfo, parseMenuInfo} from './menuinfo.ts'
+export type {MenuInfoPatch} from './menuinfo.ts'
 export {formatServerInfo, parseServerInfo} from './servinfo.ts'
 export {extractTexture, getTextureInfo} from './texture.ts'
 export {formatWorld, parseWorld} from './world.ts'
@@ -124,6 +126,7 @@ export type {
   LevelInfo,
   LightSource,
   MapMatrix,
+  MenuInfo,
   Mesh,
   MeshFace,
   ParseConfigOptions,

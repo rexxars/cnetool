@@ -415,15 +415,50 @@ These are confirmed as the real keys, not a paraphrase: they appear byte-for-byt
 
 The decoded payload is three fixed **272-byte blocks**, each a `char name[16]` tag followed by a 256-byte struct (MSVC `0xCC` fill marks fields never written):
 
-| Block         | Holds                                                                                                                                                                                                                                                                                                                                                                       |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PlayInfo`    | Multiplayer identity + match setup - **host/server name** (struct `+0x0a`, 40 bytes, default `"Unnamed"`) and **player name** (struct `+0x32`, 20 bytes, default `"RED"`), plus number/flag fields at the top (map, game mode, max players) and a numeric team code (~`+0x4a`). These alias the runtime globals the `+hostname`/`+name`/`+map`/`+game`/`+team` flags write. |
-| `LevelsDone`  | Campaign progress - a per-level completion array (all-zero in a fresh profile).                                                                                                                                                                                                                                                                                             |
-| `OptionsMenu` | Audio/video/control settings - volume bytes (default `0x80`), then the display mode: width `u16` at struct `+0x06`, height `u16` at `+0x08`, colour-depth byte at `+0x0a`. Default `80 02`/`e0 01`/`10` = 640×480×16 (the decoded 1.50 MP-demo carries `00 04`/`00 03`/`20` = 1024×768×32).                                                                                 |
+| Block         | Holds                                                                                                                                                                                                             |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PlayInfo`    | Multiplayer identity + match setup + last-session state: net protocol, last-connected server IP, host + player names, team, game mode, max players, last level, and the last savegame slot. Full field map below. |
+| `LevelsDone`  | Campaign progress - a per-level completion array (all-zero in a fresh profile).                                                                                                                                   |
+| `OptionsMenu` | Audio/video settings: soundfx + music volumes, sound channels, detail, graphicFX, renderer, resolution + colour depth, language, subtitles. Full field map below.                                                 |
 
-So it's the menu's persisted **profile + progress + options** - the only genuinely authored-by-play file in this group. The block framing (`name[16]` + 256-byte blob) is byte-confirmed across versions. The `PlayInfo` name offsets are confirmed, not guessed: the block loads to `0x557500`, and the `+hostname`/`+name` flags (`FUN_004426a0`) write straight into struct `+0x0a`/`+0x32` - the same fields the default-init (`FUN_0043fef0`) seeds with `"Unnamed"` (host) / `"RED"` (player). The 40- and 20-byte field sizes match the `+hostname` (≤39) and `+name` (≤19) limits. The resolution triple is likewise confirmed from the `OptionsMenu` default-init (`FUN_00440000`). Remaining flag/volume bytes are inferred from their readable defaults.
+So it's the menu's persisted **profile + progress + options** - the only genuinely authored-by-play file in this group. The block framing (`name[16]` + 256-byte blob) is byte-confirmed across versions. Offsets below are **block-relative** (the 16-byte tag is `0x00-0x0f`; the 256-byte struct body starts at `0x10`).
 
-`cnetool`'s `parseMatrix` (with `projectToMap`) and `parseLights` decode the two structured ones (see the README).
+**`PlayInfo` fields:**
+
+| Offset | Field              | Type       | Notes                                                                            |
+| ------ | ------------------ | ---------- | -------------------------------------------------------------------------------- |
+| `0x10` | last level         | `u8`       | last-played SP campaign number, or MP map (`≥128`)                               |
+| `0x11` | multiplayer flag   | `u8`       | `1` = last level was multiplayer, `0` = single-player                            |
+| `0x13` | max players        | `u8`       |                                                                                  |
+| `0x15` | network protocol   | `u8`       | `1` = TCP/IP, `0` = IPX                                                          |
+| `0x16` | last server IP     | `4 × u8`   | dotted-quad octets of the last-joined server (the port is **not** stored here)   |
+| `0x1a` | host / server name | `char[40]` | NUL-terminated, default `"Unnamed"`                                              |
+| `0x42` | player name        | `char[20]` | NUL-terminated, default `"RED"`; the host truncates it to 10 chars over the wire |
+| `0x57` | game mode          | `u8`       | `0` = deathmatch, `1` = ctf, `2` = teamplay                                      |
+| `0x58` | savegame slot      | `u16`      | `0xffff` = none, `0xfffe` = `temp.dat`, `N` = `sg<N>.dat`                        |
+| `0x5a` | team               | `u16`      | `0` = red, `1` = blue, `2` = auto (see note)                                     |
+
+`0x12` and `0x14` are `0` in every captured file (undetermined - likely reserved). **Team `2` ("auto") is a directive, not a stored state:** hosting with auto assigns a concrete team and persists _that_, so a saved file only ever holds `0`/`1`.
+
+**`OptionsMenu` fields:**
+
+| Offset | Field          | Type  | Notes                                                                          |
+| ------ | -------------- | ----- | ------------------------------------------------------------------------------ |
+| `0x10` | soundfx volume | `u8`  | `0-255`                                                                        |
+| `0x11` | music volume   | `u8`  | `0-255`                                                                        |
+| `0x12` | sound channels | `u8`  | literal count: `4` / `8` / `16`                                                |
+| `0x13` | detail         | `u8`  | `0` = low, `128` = medium, `255` = max                                         |
+| `0x14` | graphicFX      | `u8`  | `0` = none, `128` = medium, `255` = max                                        |
+| `0x15` | renderer       | `u8`  | `0` = 3dfx/Glide, `1` = Direct3D, `2` = software                               |
+| `0x16` | screen width   | `u16` | changing the renderer rewrites the whole resolution triple                     |
+| `0x18` | screen height  | `u16` |                                                                                |
+| `0x1a` | colour depth   | `u8`  | bits per pixel (`16` / `32`)                                                   |
+| `0x1d` | language       | `u8`  | EFIGS: `1` = English, `2` = Spanish, `3` = Italian, `4` = French, `5` = German |
+| `0x21` | subtitles      | `u8`  | `1` = on, `0` = off                                                            |
+
+The bytes at `0x1c`/`0x1e`/`0x1f`/`0x20` feed the engine's mode-change detector (they trigger a renderer reinit when they differ from the live mode) and are `~0` in captures.
+
+Most of these are confirmed two ways: the `+hostname`/`+name`/`+map`/`+game`/`+team`/`+connect` command-line flags (`FUN_004426a0`) write straight into the `PlayInfo` struct (the block loads to `0x557500`), the default-init (`FUN_0043fef0`) seeds `"Unnamed"`/`"RED"`, and the values were cross-checked by editing each in-game and diffing the re-encoded file. The language enum comes from the localized-cutscene switch (`m1c4sp/it/fr/ty.smk`; `ty` = _Tyska_, Swedish for German). `cnetool`'s `parseMenuInfo`/`formatMenuInfo` (and the `menuinfo` CLI command) read and rewrite these fields; `parseMatrix`/`parseLights` decode the two structured blocks (see the README).
 
 `servinfo.dat` is the **host's multiplayer match settings**: a header-less run of **4 × `uint32`** (little-endian), exactly 16 bytes. It is read and written only by the game **host** - both the loader (`FUN_004735c0` @ `0x4735c0`, `fopen(…,"rb")`) and the saver (`FUN_00473650` @ `0x473650`, `fopen(…,"wb")`) are gated on `FUN_00441560() != 0` (is-host) **and** the game-mode flag `DAT_004de78c & 1` (set in the deathmatch/team MP modes). On load the host reads the four values back into its match-state globals and calls `FUN_00473a60` to broadcast the limits to connected clients; on save it writes them straight back out.
 
