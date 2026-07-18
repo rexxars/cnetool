@@ -11,6 +11,7 @@ import {runMesh} from './cli/mesh.ts'
 import {runObject} from './cli/object.ts'
 import {runServer} from './cli/server.ts'
 import {runServinfo} from './cli/servinfo.ts'
+import {runStatTable} from './cli/stattable.ts'
 import {runTabmap} from './cli/tabmap.ts'
 import {runWorld} from './cli/world.ts'
 
@@ -28,6 +29,7 @@ Commands:
   convert <file>           Convert a texture between TGA and PNG
   servinfo <servinfo.dat>  Read or edit host multiplayer match settings
   menuinfo <menuinfo.dat>  Read or edit the persisted menu profile / options
+  stattable <data3.bin>    Dump an obfuscated stat table (data3/data4) as text or JSON
   server <list|query>      Discover servers (master list + LAN) or query one
 
 Run "cnetool <command> --help" for command-specific options.
@@ -63,6 +65,9 @@ async function main(argv: string[]): Promise<void> {
       return
     case 'menuinfo':
       await runMenuInfo(rest)
+      return
+    case 'stattable':
+      await runStatTable(rest)
       return
     case 'server':
       await runServer(rest)
