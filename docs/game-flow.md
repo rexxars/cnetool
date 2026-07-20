@@ -70,7 +70,7 @@ Space-separated, each token **`+`-prefixed** (parsing stops at the first non-`+`
 
 ### Level 250 - the built-in editor, and why the 1.36 folder trick broke in 1.41
 
-Level number **250** (`0xfa` in the running-level global `DAT_004c2d14`) is the engine's edit/debug mode. The per-feature checks are scattered as `== 0xfa` comparisons and are **identical in 1.36 and 1.41**: the chat-line `place <object>` handler (`FUN_0043bff0` in 1.41), numpad object placement, the debug overlay + god-mode auto-enable at level load, the tab-map matrix editor, and the world.dat write-back on exit. The community method for 1.36 (documented in fan mapmaking guides) was: copy a level into a `level250\` directory, add a `Val:250` entry to `LEVELS.NFO`, host a game on it, and you're in the editor.
+Level number **250** (`0xfa` in the running-level global `DAT_004c2d14`) is the engine's edit/debug mode. The per-feature checks are scattered as `== 0xfa` comparisons and are **byte-identical across 1.36/1.41/1.42/1.43**: the chat-line `place <object>` handler (`FUN_0043bff0`), the numpad/`~` placement + tab-map editor (in the lifecycle loop `FUN_004438c0`), shoot-to-delete (`FUN_0044f0e0` swaps the bullet callback), the debug overlay + god-mode auto-enable at level load, and the `world.dat` write-back. The full control map and the complete `== 0xfa` inventory are in § The editor's controls below. The community method for 1.36 (documented in fan mapmaking guides) was: copy a level into a `level250\` directory, add a `Val:250` entry to `LEVELS.NFO`, host a game on it, and you're in the editor.
 
 That stopped working in 1.41 not because the editor changed, but because **1.41 repurposed the `level250` directory name as an indirection for the new `+edit` flag**:
 
@@ -79,6 +79,60 @@ That stopped working in 1.41 not because the editor changed, but because **1.41 
 - `SetScriptPath` (`FUN_004885e0`) similarly substitutes `DAT_00557480` for the script directory when the level is 250, and GameSpy init (`FUN_00423bd0`) is skipped.
 
 So in 1.41, hosting a `Val:250` level from the menu still enters edit mode, but every file open of `LEVEL250\...` is redirected to `<empty>\...` (the `+edit` buffer is zero-initialized BSS) - i.e. the root of the current drive - and the load dies on the first missing level file. The `level250\` folder itself is never read. The editor still works in 1.41/1.42 via `ce.exe +edit "<dir>"`, which is exactly what the redirect was built for; `+edit "level250"` reproduces the old 1.36 behavior (the rewrite maps `level250\` onto itself). A trivial patch to restore the folder trick would be to skip the rewrite in `FUN_00468f50` when `DAT_00557480[0] == 0`.
+
+### The editor's controls
+
+All keyboard reads go through the DirectInput helper `FUN_00483770(scancode)` - it returns `keystate[scancode] & 0x80` on the 256-byte state array at `DAT_005523b8` - so these are **physical DirectInput scancodes, independent of NumLock**. The whole editor input block lives in the lifecycle loop `FUN_004438c0`. Two things gate it: the **`` ` ``/`~` key (grave, `0x29`)** is a per-frame _mode switch_ (released → object nudge; held → tab-map matrix editor), and object placement first needs a "held" preview object spawned via the chat command `place <object>` (`FUN_0043bff0` sets the preview handle `DAT_004c1830`).
+
+**Adding an object.** Type `place <object>` in the chat line to spawn a ghost/preview, then position it with the numpad (offsets accumulate in camera-relative axes via `FUN_0043b890`, re-applied each frame by `FUN_0043bdb0`, which also copies the camera's orientation onto the object). `~` must **not** be held:
+
+| Key      | Scancode | Action                                                    |
+| -------- | -------- | --------------------------------------------------------- |
+| Numpad 8 | `0x48`   | move +Z                                                   |
+| Numpad 2 | `0x50`   | move −Z                                                   |
+| Numpad 4 | `0x4B`   | move −X                                                   |
+| Numpad 6 | `0x4D`   | move +X                                                   |
+| Numpad 9 | `0x49`   | move −Y                                                   |
+| Numpad 3 | `0x51`   | move +Y                                                   |
+| Numpad 0 | `0x52`   | reset the offset to zero (re-center on camera)            |
+| Numpad 5 | `0x4C`   | **stamp/commit** the object (with a key-release debounce) |
+| L-Shift  | `0x2A`   | step-size modifier (scales the nudge by `_DAT_004a13b8`)  |
+
+Numpad 5 runs `FUN_0043b980`: spawns a real object of the held type, copies the preview's position + orientation onto it, clears the preview flags, and **appends the block to `LEVEL<n>\world.dat`** (opened via the fopen wrapper; path format `level%d\world.dat`). So the write-back happens per-stamp, not only on exit.
+
+**Deleting an object - shoot it.** In edit mode the gun-fire setup `FUN_0044f0e0` sets the projectile's on-hit callback (`obj+0x30c`) to `LAB_0043b730` instead of the normal impact handler `LAB_00450180`. That edit-mode handler (Ghidra leaves it undecompiled - it's only address-referenced; disassembly shows it calls `FUN_0043b5a0` at `0x43b775`/`0x43b7c5`/`0x43b802`) opens `LEVEL<n>\world.dat` in mode `"r+t"`, scans records for the one whose **Translation X and Z** match the shot object, seeks back over its 4-byte record tag and overwrites it with `"Dele"` in place, then deletes `LEVEL<n>\faccache.bin` and `LEVEL<n>\data1.bin` so the level rebuilds without it. This is the live counterpart to the `place`+numpad-5 stamp, and produces exactly the `Dele:` tombstone documented in [formats.md](./formats.md) (the loader skips `Dele` blocks; the editor keeps them so it can list/restore). Objects are matched by X/Z only, so two stacked at the same X/Z are ambiguous to this routine. Data confirmed against 1.41: `DAT_004c1b70` = the literal bytes `Dele`, fopen mode `r+t`, path `level%d\world.dat`.
+
+**Tab-map (MAPMTX) matrix editor - `~` held.** Operates on the 3×3 matrix at `&DAT_004c2d18` (prints `EditMap Scale`):
+
+| Key          | Scancode      | Action                                                             |
+| ------------ | ------------- | ------------------------------------------------------------------ |
+| Numpad 4 / 6 | `0x4B`/`0x4D` | translate matrix X (`DAT_004c2d20`)                                |
+| Numpad 8 / 2 | `0x48`/`0x50` | translate matrix Y (`DAT_004c2d2c`)                                |
+| Numpad 1     | `0x4F`        | scale ×0.98 (shrink)                                               |
+| Numpad 3     | `0x51`        | scale ×1.02 (grow)                                                 |
+| Numpad 5     | `0x4C`        | **save** → writes `LEVEL<n>\MAPMTX.DAT` (9 floats, `FUN_00447270`) |
+
+This is the same set of physical keys the community guides describe as "`~`+arrows to move, End/PgDn to scale, `~`+numpad-5 to save": with NumLock off, numpad 4/8/6/2 are the arrows, numpad 1 = End, numpad 3 = PgDn. DirectInput reads the scancode regardless of NumLock, so both descriptions point at the same keys.
+
+**Sun/horizon - `~` held, edit mode only.** `N` (`0x31`) / `M` (`0x32`) decrement/increment `SunDirection` (`DAT_004de960`); `K` (`0x25`) applies and prints `horizonRotation %f SunDirection %f` (debounced).
+
+**Debug / camera (not strictly editor-gated).** `F10` (`0x44`) toggles the debug/god overlay (`DAT_004d3c94`, needs `DAT_004d7abc==1`); `PrintScreen`/`SysRq` (`0xB7`) writes a screenshot `shot<d>.tga` via the per-renderer grab pointer `DAT_0053fae4` (`ecx`=filename, `edx`=mode; PrintScreen passes 0). The D3D routine `D3DGrabScreen` (`0x460180`) captures at a hardcoded **640×480**: it mallocs `640*480*3`, `StretchBlt`s (HALFTONE) the front buffer — rendered at `DAT_005555b0`×`DAT_005555b4` — down into a 640×480 surface, and hands it to the TGA writer (`0x4646c0`). The Glide routine (`0x4631c0`) captures at the render resolution. The savegame path (`0x441ebe`) calls the same routine with `edx=1` to derive the save/load-menu thumbnail via `HalfScalePic` (`0x464770`), which repeatedly halves the capture until it fits the target box (640×480 → 80×60). The shot number is a zero-initialized stack local of `FUN_004438c0` incremented per shot (`0x4443cf`) — it restarts at 1 every run, and the TGA writer `fopen`s `"wb"`, so a new session overwrites the previous one's screenshots. The handler polls the key at three sites (`0x4443a9` trigger + `0x4443b4`/`0x4443c4` wait-for-release debounce) via the key-down poll `0x483770` (`cl` = DIK code → `eax` = 0/0x80 from the DirectInput state array `0x5523b8`). Chat/console keys live in `ConsoleKeyHandler` (`0x43b310`): from the idle state, `F7` (`0x41`) opens chat (team chat when `DAT_004de794` is set, else all-chat), `F8` (`0x42`) opens all-chat, and the console opens on `F12` (`0x58`, poll at `0x43b421`) **or `LAlt`+`S`** (`0x38`+`0x1F`); the selected mode is written to `[menuobj+0x9c]` (1/2 = chat, 4 = console). The console predates 1.41 (present since at least 1.33). `F11` (`0x57`) is polled nowhere in 1.41 or 1.43 — when checking whether the engine uses a key, byte-scan the binary for `b1 <key> e8 →0x483770` call patterns rather than grepping the decompile (pointer-reached handlers only appear in the dump because they are force-seeded via `scripts/ghidra/force-functions-ce.txt`). Free-camera rotate/pan (`FUN_0047cca0`), gated on the spectator cam being active (`object[0x286] > 0`) rather than on edit mode: `PgUp` `0xC9`, `Insert` `0xD2`, `Delete` `0xD3`, `PgDn` `0xD1`, `End` `0xCF`, `Home` `0xC7`; view presets `F1`–`F4` (`0x3B`–`0x3E`) and `F9` (`0x43`).
+
+#### The complete `DAT_004c2d14 == 0xfa` inventory
+
+Every place the engine branches on edit mode (`1.41` addresses; behavior identical on 1.42/1.43):
+
+- **`FUN_00423bd0` (0x423bd0)** - GameSpy init is **skipped** in edit mode.
+- **`FUN_0043bff0` (0x43bff0)** - the `place <object>` chat command: resolves object-name aliases (`aship`/`plane`/`plane2`/`battleshipa`/…), spawns the preview handle `DAT_004c1830`, and turns god-mode on (`DAT_004d7abc = 1`).
+- **`FUN_004438c0` (0x4438c0), level-load** - on entering an edit-mode level, **god-mode auto-enables** (`DAT_004d7abc = 1`) and the **debug overlay** turns on (`DAT_004d3c94 = -1`).
+- **`FUN_004438c0`, input loop** - the `~`/numpad placement + tab-map editor above. (Firing god-mode in a _non_-edit multiplayer level instead prints `godmode on in multiplayer` and refuses.)
+- **`FUN_0044f0e0` (0x44f0e0)** - swaps the bullet on-hit callback to the shoot-to-delete handler (above).
+- **object update (~0x443…, near line 43432)** - a preview/held object (flag `0x20000`) is **frozen** in edit mode: its flags are cleared and recomputed but the normal drop/simulate path (`FUN_00475ae0` gravity + `FUN_00440170`) is skipped, so it doesn't fall while you position it. (Vehicles still fall once _entered_ - see [new-level-recipe.md](./new-level-recipe.md).)
+- **`FUN_004764b0` (0x4764b0)** - the player/camera spawns at world **origin** `(0,0,0)` and is snapped to the terrain surface (raycast via `FUN_00470700`).
+- **`FUN_00473a60` (0x473a60)** - the per-change network state broadcast (`thunk_FUN_004242e0`) is a **no-op** in edit mode (single-player, nothing to sync).
+- **player-join handler (0x476…, near line 70881)** - a joining player is **refused** (early return sending message `0x23`), consistent with `+edit` forcing `maxplayers = 1`.
+- **`FUN_0047aef0` (0x47aef0) and the periodic update (near line 76037)** - the GameSpy master-server heartbeat (`FUN_00423ba0` / `FUN_004240b0`) is **skipped** in edit mode.
+- **`SetScriptPath` `FUN_004885e0` (0x4885e0)** - the script directory is redirected to the `+edit` buffer `DAT_00557480` (see the `+edit` indirection above).
 
 ### `4711 <N>` - the dev autostart token (not a port)
 
@@ -110,6 +164,29 @@ All cutscene playback funnels through a shared play-by-name routine, plus a boot
 - **The boot reel.** The menu function builds a NUL-terminated pointer array of exactly three paths on its stack at entry (`0x4415b8`..`0x4415d2`): `cutscn\logga.smk` (the Refraction Games logo), `cutscn\intro.smk` (the campaign intro movie) and `cutscn\m1c2.smk` (mission 1's opening cutscene). Each is prefixed with the Drive path (`sprintf "%s\%s"`, CDPath getter `FUN_0044c120`) and the array is handed to the Smacker list player `0x447c60`, which `SmackOpen`s each entry and **skips silently on failure** - why installs without the CD (or a copied `CUTSCN/` folder) show nothing at boot. The whole block is gated by `test esi,esi; je 0x441718` at `0x4416bd` on the menu function's arguments (the skip path and the after-playback path converge on identical code). Notably `m1c2.smk` appears in **no level script** - the boot reel is the only place it ever plays. (The community 1.50 patch skips the reel and plays intro + m1c2 once at campaign start instead.)
 - **Play-by-name** `0x44c1a0` (fastcall, `ecx` = bare filename; `0x44c320` is a thin jmp alias): logs `"Try to play: %s"`, builds `<Drive>\cutscn\<name>` (`"%s\cutscn\%s"`), and plays; a missing file is logged and skipped. On **level 1** it substitutes the localized variants for `m1c4.smk` (`m1c4fr/it/sp/ty.smk`, switch at `0x44c1f4` on the language byte `DAT_0055763d`). Callers: `REFShowCutscene` (`0x48cdb0` pops the script string and tail-jumps here) and the hardcoded end-of-campaign credits at level 12 (`0x44485a`).
 - **Menu commands 8/9** - the menu DLL driver (`0x442ef0`, which LoadLibrary's `MENUDLL.DLL` and calls its ordinal-2 entry) treats menudll return codes **8** and **9** as "view intro" / "view credits": handled at `0x442f4e`/`0x442f64` via a sibling single-file player (`0x442e80`, same `<Drive>\cutscn\` prefixing), then re-enters the menu.
+
+## Input: two separate systems
+
+Keyboard input is handled by **two independent paths that live in different binaries and never meet**. This is why some keys are rebindable in the menu and a much larger set (camera views, editor keys, screenshot, …) are not.
+
+### 1. Configurable "actions" - `MENUDLL.DLL` + `lobby.exe`, networked
+
+The 13 rebindable gameplay actions - the ones the `Configure keys` menu lists - are owned entirely by the menu DLL and the multiplayer helper, **not** `ce.exe`:
+
+- **`KEYCONF.DAT` / `KEYDEFS.DAT`** hold the bindings (see [formats.md](./formats.md#text-config-family-keyvalue)). `KEYDEFS.DAT` is the name -> scancode dictionary; `KEYCONF.DAT` is the `Action:primary [secondary]` list.
+- **`MENUDLL.DLL`** reads and writes `KEYCONF.DAT` and draws the config screen. Two facts make the action set effectively hardcoded despite the menu looking data-driven:
+  - The **reader** pre-fills a fixed **13-slot** array, stores each line's binding **by line index** (the action name before the `:` is never parsed), and hard-requires the count to equal `0xd` or it bails with `error bindkeydefs %d(i)!=%d(SIZE_OF_ACTIONS)`. So an action's identity is its **slot position**, not its name - and an extra line makes the whole file fail to load.
+  - The **writer** is fully unrolled: 13 literal calls emitting `Fire:`, `UseItem:`, `ChangeItem:`, `DropItem:`, `Jump:`, `Pitch+:`, `Pitch-:`, `Roll+:`, `Roll-:`, `Forward+:`, `Forward-:`, `Yaw+:`, `Yaw-:`. The on-screen labels (`"FIRE"`, `"JUMP"`, …) are `.rdata` strings used both as the row label and as the in-menu registry key the binding is stored/looked-up under; they are **not** written to the file.
+- **`lobby.exe`** (not `ce.exe`) resolves the 13 bindings, reads the DirectInput keyboard, and packs the current state into a **4-byte input frame** (`FUN_00409860`) sent as UDP type `0x02` to the host - abstracted "action intent", not scancodes (see [network.md](./network.md)). Even single-player runs through this host/slave path.
+- `ce.exe`'s own keyconf loader (`FUN_00441490`) reads **only** the optional `InvertMouseY` line; it does not parse the bindings, and `FUN_00409860` isn't present in `ce.exe` at all.
+
+Because the slot index is wired to a fixed bit in the wire frame and to fixed gameplay behavior, adding an action means bumping `SIZE_OF_ACTIONS` in **both** `MENUDLL.DLL` and `lobby.exe`, possibly widening the frame, and giving the new slot a consumer - i.e. touching the netcode. (One action is dual-purpose without any of that: `Jump:` also drops a bomb while flying - the community patch relabels it `Jump/drop bomb`, a `MENUDLL.DLL`-only string change.)
+
+### 2. Hardcoded local keys - `ce.exe`, direct scancodes
+
+Everything else - camera views (`F1`-`F4`/`F9`), the whole numpad/`~` editor set (see § The editor's controls), the screenshot key, camera rotate (`PgUp`/`End`/…), `F10`, Esc/Enter/Space - is read by `ce.exe` directly through the DirectInput helper **`FUN_00483770(scancode)`** (`keystate[scancode] & 0x80` on the 256-byte array at `DAT_005523b8`). There are **98** such reads; **77** are the literal form `mov cl, imm8 ; call FUN_00483770` (a one-byte scancode immediate). These keys are **local view/UI concerns**: not networked, not in `KEYCONF.DAT`, and not exposed by the menu.
+
+Making these rebindable is therefore a **local** job in `ce.exe` (a binding table + loader + per-call-site detours), with no reason to route them through the 13-action system - the `mov cl, imm8` immediate is the whole binding. The input region is byte-identical across 1.41/1.42/1.43, so one patch set covers all three.
 
 ## Level load
 
