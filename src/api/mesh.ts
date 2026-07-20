@@ -263,15 +263,16 @@ function dropRedundantFaces(faces: MeshFace[]): MeshFace[] {
 
 /**
  * Target up-axis for an exported mesh. The game stores models with **−Y as up**,
- * so the default `'y'` flips them vertically to a conventional upright **Y-up**;
- * `'z'` orients to **Z-up** (Blender / Unreal); `'raw'` leaves the data untouched
- * (−Y-up, as stored). Reflecting transforms also reverse face winding so normals
- * stay outward.
+ * so the default `'y'` rotates them 180° about X (`x, −y, −z`) to a conventional
+ * upright **Y-up**; `'z'` orients to **Z-up** (Blender / Unreal); `'raw'` leaves
+ * the data untouched (−Y-up, as stored). Both re-orientations are proper
+ * rotations - a plain Y negation would mirror the world (map layout flipped,
+ * lettering reversed).
  */
 export type ObjUp = 'y' | 'z' | 'raw'
 
 const REORIENT: Record<ObjUp, {map: (v: Vector3) => Vector3; flipsWinding: boolean}> = {
-  y: {map: (v) => ({x: v.x, y: -v.y, z: v.z}), flipsWinding: true}, // −Y-up → Y-up (reflection)
+  y: {map: (v) => ({x: v.x, y: -v.y, z: -v.z}), flipsWinding: false}, // −Y-up → Y-up (180° X-rotation)
   z: {map: (v) => ({x: v.x, y: v.z, z: -v.y}), flipsWinding: false}, // −Y-up → Z-up (rotation)
   raw: {map: (v) => v, flipsWinding: false}, // as stored (−Y-up)
 }
@@ -608,7 +609,7 @@ export function objToMesh(text: string, options: ObjToMeshOptions = {}): Mesh {
 
   const mesh: Mesh = {vertices, faces}
   if (up === 'raw') return mesh
-  if (up === 'y') return orientMesh(mesh, 'y') // the Y reflection is its own inverse
+  if (up === 'y') return orientMesh(mesh, 'y') // the 180° X-rotation is its own inverse
   // 'z': invert orientMesh's (x, z, −y) rotation → (x, −z, y)
   return {vertices: vertices.map((v) => ({x: v.x, y: -v.z, z: v.y})), faces}
 }

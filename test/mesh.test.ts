@@ -472,14 +472,16 @@ describe('orientMesh (up-axis)', () => {
     expect(orientMesh(mesh, 'raw')).toEqual(mesh)
   })
 
-  test("'y' (default) flips -Y-up to upright Y-up, reversing winding + UVs", () => {
+  test("'y' (default) rotates -Y-up to upright Y-up (180° about X), keeping winding", () => {
     const m = orientMesh(mesh, 'y')
-    expect(m.vertices[0]).toEqual({x: 1, y: -2, z: 3})
-    expect(m.faces[0]!.vertices).toEqual([2, 1, 0]) // reflection: winding reversed
+    expect(m.vertices[0]).toEqual({x: 1, y: -2, z: -3})
+    // a rotation preserves chirality, so winding (and UVs) stay as stored -
+    // a plain Y negation would mirror the world (map flipped, lettering reversed)
+    expect(m.faces[0]!.vertices).toEqual([0, 1, 2])
     expect(m.faces[0]!.uv).toEqual([
-      [1, 1],
-      [1, 0],
       [0, 0],
+      [1, 0],
+      [1, 1],
     ])
   })
 
@@ -490,7 +492,7 @@ describe('orientMesh (up-axis)', () => {
   })
 
   test('meshToObj flips by default; up:raw leaves it', () => {
-    expect(meshToObj(mesh)).toContain('v 1 -2 3') // default 'y' flip
+    expect(meshToObj(mesh)).toContain('v 1 -2 -3') // default 'y' rotation
     expect(meshToObj(mesh, {up: 'raw'})).toContain('v 1 2 3')
     expect(meshToObj(mesh, {up: 'z'})).toContain('v 1 3 -2')
   })
