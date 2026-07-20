@@ -143,6 +143,29 @@ The two hardware render paths differ, and neither limit is a property of the fil
 - **Direct3D**: **no engine-side limit.** The TGA's dimensions go straight into `CreateSurface`, and the mip-cap table (`0x4cd7e8`) anticipates sizes up to 16384. CE never queries the driver's max-texture caps, so the real ceiling is the driver: period hardware may fail the surface creation (logged `createtexture %s error`, texture comes back missing, not fatal), modern drivers/wrappers accept large textures. This is what makes upscaled-texture packs viable on the D3D renderer.
 - **Both paths**: when the texture-detail option is low (byte 3 of the options block `0x557630` = 0), anything wider than 128 is box-downsampled (`FUN_00464c80`) to **128×128** before upload. Testing high-res textures requires the high texture-detail setting.
 
+### Font textures (`FONT_1`-`FONT_4`, `FONT`)
+
+All in-game text (HUD, chat, scoreboard, overhead player names) is drawn from four 128×128 glyph atlases in `textures.dat`: `FONT_1.tga`-`FONT_4.tga`, each an 8×8 grid of 16×16-pixel cells. The per-character draw routine (`DrawChar` `0x43d170`) lazy-loads all four by name on the first character drawn (`font_N not found` assert on failure) and treats them as one 256-slot font indexed by the raw byte `c`:
+
+| piece   | formula         | meaning                                                |
+| ------- | --------------- | ------------------------------------------------------ |
+| texture | `bit7 + 2·bit3` | 0 = `FONT_1`, 1 = `FONT_3`, 2 = `FONT_2`, 3 = `FONT_4` |
+| row     | `(c >> 4) & 7`  | cell row, top = 0                                      |
+| column  | `c & 7`         | cell column                                            |
+
+So `FONT_1` holds bytes with `(c & 0x88) == 0x00` (ASCII with low nibble 0-7), `FONT_2` the ASCII bytes with low nibble 8-F, and `FONT_3`/`FONT_4` repeat that split for bytes ≥ `0x80`. In low-resolution mode (flag `0x4ddf00`) the routine instead loads a single `loresfnt.tga` laid out as a 16×16 grid of 8×8 cells indexed by the whole byte - no shipped archive in the full-game 1.41 install carries that entry, so the branch asserts if ever taken there.
+
+The glyph inventory follows **code page 850** (DOS Latin-1), letters only:
+
+- **Full printable ASCII `0x20`-`0x7E`.** One artistic liberty: the `$` cell (`0x24`) is drawn as a **`€` sign**, so dollar signs render as euros.
+- **CP850 accented letters**: `0x80`-`0x9D` (Ç ü é â ä à å ç ê ë è ï î ì Ä Å É æ Æ ô ö ò û ù ÿ Ö Ü ø £ Ø), `0xA0`-`0xA5` (á í ó ú ñ Ñ), `0xA8`/`0xAD` (¿ ¡), `0xB5`-`0xB7` (Á Â À), `0xC6`-`0xC7` (ã Ã), `0xD1`-`0xD8` + `0xDE` (Ð Ê Ë È ı Í Î Ï, Ì), `0xE0`-`0xE5` (Ó ß Ô Ò õ Õ), `0xE9`-`0xED` + `0xEF` (Ú Û Ù ý Ý ´). Nine of these are lazy pixel-copies of their base ASCII cell and render without the diacritic: Ç→C, ç→c, æ→a, Æ→A, ø→o, Ø→O, Ð→D, ¿→?, ¡→!.
+- **Every other cell is a pixel-copy of the `*` glyph** (`0x2A`), so unsupported bytes - the rest of CP850's symbols, box-drawing, all of `0xF0`+ - render as an asterisk. Note the CP850 layout means text stored in Windows-1252 (e.g. `ö` = `0xF6`) hits these filler cells; the CP850 byte (`ö` = `0x94`) is what renders correctly.
+- **Icon cells in the control range**: `0x01` = red ✗, `0x02` = green ✓ (full 16×16 cells), plus three 32×32 emblems split across 2×2 cells (top halves / bottom halves one row apart): roundel flag `0x03 0x04` / `0x13 0x14`, red eagle flag `0x05 0x06` / `0x15 0x16`, white eagle crest `0x0D 0x0E` / `0x1D 0x1E`.
+
+`FONT.tga` (64×64) is the **previous generation's font** - a packed uppercase-only strip (A-Z, 0-9, `. , : ; ! ? ( ) " ' - +`). The 1.0/1.33/1.36 engines (and the singleplayer demo) load it as `font.tga`; 1.41+ never references it and it survives in `textures.dat` as a leftover.
+
+Other font textures, each with its own consumer: `Cutfont.tga` (Smack cutscene subtitles, load at `0x4481a0`), `BRIFONT.tga` (briefing text, referenced by the 1.0 engine only), `menufont.tga` (in `MENU/menupics.dat`, used by `MENUDLL.DLL` - the menu never draws with the in-game atlases, which is why menu text and in-game text can disagree), and `Bfont_1.tga`/`Cfont_1.tga`/`Cfont_2.tga` (filenames embedded in the ~172-byte interface-descriptor structs at `0x4c0be0`-`0x4c1750`, consumed by the ingame/briefing interface init `0x439040`/`0x4390b0`).
+
 ## `objects.dat` payloads - "projects" (models & terrain)
 
 `objects.dat` uses the same container, but each blob is a **"project"** (the engine's term for a 3D model). Crucially, this includes the **level terrain**: projects named `land1`-`land10` and `level9`/`level11`/`level12` are the level landscapes (eg `land1` spans ~30000×30000 world units). So the same format covers both props and the playable world.
