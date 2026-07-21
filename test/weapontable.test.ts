@@ -185,6 +185,71 @@ describe('parseWeaponTable / serializeWeaponTable', () => {
     expect(() => parseWeaponTable(raw)).toThrow(/Armor/i)
   })
 
+  test('throws when the header is missing a damage row', () => {
+    const raw = buildWeaponBytes([
+      'Armor:  Heavy Light No',
+      'gas:100,100,100',
+      'bullet:11,21,100', // shell row missing
+      'Name:0-GUN',
+      'AmmoSpeed:75',
+      'FireDelay:1',
+      'Damage:5',
+      'AmmoType:bullet',
+      'WeaponLength:3',
+      'Sound:x.wav',
+    ])
+    expect(() => parseWeaponTable(raw)).toThrow(/shell/i)
+  })
+
+  test('throws on a malformed damage row (wrong number of comma parts)', () => {
+    const raw = buildWeaponBytes([
+      'Armor:  Heavy Light No',
+      'gas:100,100,100',
+      'bullet:1,2', // only two values
+      'shell:100,100,100',
+      'Name:0-GUN',
+      'AmmoSpeed:75',
+      'FireDelay:1',
+      'Damage:5',
+      'AmmoType:bullet',
+      'WeaponLength:3',
+      'Sound:x.wav',
+    ])
+    expect(() => parseWeaponTable(raw)).toThrow(/bullet/i)
+  })
+
+  test('throws on an unrecognized header key', () => {
+    const raw = buildWeaponBytes([
+      'Armor:  Heavy Light No',
+      'gas:100,100,100',
+      'plasma:1,2,3', // not a known ammo type
+      'shell:100,100,100',
+      'Name:0-GUN',
+      'AmmoSpeed:75',
+      'FireDelay:1',
+      'Damage:5',
+      'AmmoType:bullet',
+      'WeaponLength:3',
+      'Sound:x.wav',
+    ])
+    expect(() => parseWeaponTable(raw)).toThrow(/plasma/i)
+  })
+
+  test('throws when a weapon record has an extra trailing field', () => {
+    const raw = buildWeaponBytes([
+      ...HEADER,
+      'Name:0-GUN',
+      'AmmoSpeed:75',
+      'FireDelay:1',
+      'Damage:5',
+      'AmmoType:bullet',
+      'WeaponLength:3',
+      'Sound:x.wav',
+      'Recoil:2', // 8th field: record.length > 7
+    ])
+    expect(() => parseWeaponTable(raw)).toThrow(/8 fields|expected 7/i)
+  })
+
   test('throws when a non-finite number is serialized (weapon)', () => {
     const bad: WeaponTable = {
       ammoDamage: TABLE.ammoDamage,

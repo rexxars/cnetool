@@ -393,7 +393,10 @@ export interface WeaponTable {
   weapons: Weapon[]
 }
 
-// The three ammo categories, used for case-insensitive value matching.
+// Two distinct orderings, kept separate on purpose: AMMO_TYPES is the match set
+// for case-insensitive key/value lookup and the header completeness check (which
+// is order-independent), while AMMO_HEADER_ORDER is the stock *file* order the
+// serializer must emit. Don't collapse them - alphabetical here, stock there.
 const AMMO_TYPES: AmmoType[] = ['bullet', 'gas', 'shell']
 
 // Stock file order of the header damage rows (gas, bullet, shell) - preserved on
@@ -513,7 +516,9 @@ function parseWeaponRecord(record: StatField[], index: number): Weapon {
  */
 export function parseWeaponTable(data: Uint8Array): WeaponTable {
   const fields = parseStatTable(data)
-  const firstName = fields.findIndex((field) => field.key === 'Name')
+  // Match the header boundary case-insensitively to stay consistent with
+  // `groupRecords(fields, 'Name')` below, which also lowercases the start key.
+  const firstName = fields.findIndex((field) => field.key.toLowerCase() === 'name')
   const header = firstName === -1 ? fields : fields.slice(0, firstName)
 
   const ammoDamage = parseWeaponHeader(header)
