@@ -132,7 +132,10 @@ async function loadEntryFile(dir: string, file: string): Promise<Uint8Array> {
     if (isEnoent(error)) throw new Error(`listed file ${file} missing from ${dir}`, {cause: error})
     throw error
   }
-  if (file.toLowerCase().endsWith('.png')) return pngToTga(bytes, {topDown: true})
+  // No validation: a round-trip build must reproduce whatever the original
+  // archive held (menupics.dat/HUD textures are legitimately non-square /
+  // non-pow2). The square+pow2 check is for authoring mistakes, not re-encoding.
+  if (file.toLowerCase().endsWith('.png')) return pngToTga(bytes, {topDown: true, validate: false})
   return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 }
 

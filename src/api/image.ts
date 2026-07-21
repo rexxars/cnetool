@@ -364,6 +364,16 @@ export interface PngToTgaOptions {
    * in-game. The inverse of {@link TgaToPngOptions.topOrigin} on the extract side.
    */
   topDown?: boolean
+
+  /**
+   * Validate the image against CE's texture rules (square, power-of-two,
+   * 24/32-bit) and throw if it can't load in-game. Defaults to `true` - the
+   * safety check for authoring. Set `false` when re-encoding an asset that
+   * already shipped in an archive (a faithful round-trip must reproduce whatever
+   * the original contained, including legitimately non-square menu/HUD textures),
+   * where the check would reject valid existing data.
+   */
+  validate?: boolean
 }
 
 // Flip a raw image vertically (returns a copy; used to pre-compensate encodeTga's
@@ -381,14 +391,17 @@ function flipRows(image: RawImage): RawImage {
 /**
  * Decode a PNG and re-encode it as a game-ready CE texture (TGA). An RGB PNG becomes a
  * 24-bit TGA; an RGBA PNG becomes a 32-bit TGA with its alpha preserved - this is how
- * you author a transparent texture (CE renders 32-bit alpha directly). The result is
- * **always** validated against CE's texture rules (square, power-of-two, 24/32-bit) and
- * rejected if it can't load in-game.
+ * you author a transparent texture (CE renders 32-bit alpha directly). By default the
+ * result is validated against CE's texture rules (square, power-of-two, 24/32-bit) and
+ * rejected if it can't load in-game; pass `{validate: false}` to skip that (see
+ * {@link PngToTgaOptions.validate} - used by the round-trip build path).
  */
 export function pngToTga(png: Uint8Array, options: PngToTgaOptions = {}): Uint8Array {
   const image = decodePng(png)
-  const issues = validateCeTexture(image)
-  if (issues.length > 0) throw new Error(`Texture is not CE-compatible: ${issues.join('; ')}`)
+  if (options.validate !== false) {
+    const issues = validateCeTexture(image)
+    if (issues.length > 0) throw new Error(`Texture is not CE-compatible: ${issues.join('; ')}`)
+  }
   // encodeTga writes rows bottom-up (honest bottom-origin); flipping first makes the
   // file store them top-down, which is what the engine reads from archive blobs.
   return encodeTga(options.topDown ? flipRows(image) : image)

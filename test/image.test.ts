@@ -199,7 +199,7 @@ describe('validateCeTexture', () => {
     ).toMatch(/channel count/)
   })
 
-  test('pngToTga always validates - rejects a non-square texture, accepts a valid one', () => {
+  test('pngToTga validates by default - rejects a non-square texture, accepts a valid one', () => {
     const bad = tgaToPng(buildTga(3, 1, 3, [0, 0, 0, 0, 0, 0, 0, 0, 0]))
     expect(() => pngToTga(bad)).toThrow(/not CE-compatible/)
     const ok = tgaToPng(
@@ -211,6 +211,15 @@ describe('validateCeTexture', () => {
       ),
     )
     expect(() => pngToTga(ok)).not.toThrow()
+  })
+
+  test('pngToTga {validate: false} accepts a non-square texture (round-trip build path)', () => {
+    const bad = tgaToPng(buildTga(3, 1, 3, [0, 0, 0, 0, 0, 0, 0, 0, 0]))
+    expect(() => pngToTga(bad)).toThrow(/not CE-compatible/)
+    expect(() => pngToTga(bad, {validate: false})).not.toThrow()
+    // The bytes are still a real 3×1 TGA (validation was the only thing skipped).
+    const decoded = decodeTga(pngToTga(bad, {validate: false}))
+    expect([decoded.width, decoded.height]).toEqual([3, 1])
   })
 })
 

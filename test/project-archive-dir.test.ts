@@ -51,10 +51,30 @@ function makeImage(size: number, seed: number): RawImage {
   return {width: size, height: size, channels: 3, data}
 }
 
+// A non-square, non-power-of-two RGB image (like a real menupics.dat/HUD texture).
+function makeRectImage(width: number, height: number, seed: number): RawImage {
+  const data = new Uint8Array(width * height * 3)
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 3
+      data[i] = (x * 3 + seed) & 0xff
+      data[i + 1] = (y * 5 + seed * 3) & 0xff
+      data[i + 2] = (x + y + seed * 7) & 0xff
+    }
+  }
+  return {width, height, channels: 3, data}
+}
+
 // A game-faithful archive texture blob: rows stored top-down behind a bottom-origin
 // descriptor (the layout the engine reads verbatim), which is exactly `topDown: true`.
 function tgaFor(image: RawImage): Uint8Array {
   return pngToTga(encodePng(image), {topDown: true})
+}
+
+// Same, but skipping CE validation - for non-square/non-pow2 fixtures that mirror
+// real archive contents (the encode path only validates for authoring mistakes).
+function tgaForRaw(image: RawImage): Uint8Array {
+  return pngToTga(encodePng(image), {topDown: true, validate: false})
 }
 
 function pixelsEqual(a: Uint8Array, b: Uint8Array): boolean {
@@ -93,6 +113,22 @@ describe('extractArchiveDir / buildArchiveDirTexture', () => {
       {file: 'a_tex.png', name: 'A_TEX.tga'},
       {file: 'btex.png', name: 'btex.tga'},
     ])
+
+    const rebuilt = await buildArchiveDirTexture(dir)
+    expect(rebuilt).toEqual(bytes)
+  })
+
+  test('round-trips a NON-square / non-pow2 texture byte-identically', async () => {
+    // Real menupics.dat / HUD textures are legitimately non-square. Init extracts
+    // them fine; build must re-encode them without the square+pow2 validation
+    // throwing (regression: a faithful round-trip of real data used to be impossible).
+    const bytes = buildTextureArchive([
+      {name: 'HUD.tga', data: tgaForRaw(makeRectImage(80, 144, 1))},
+      {name: 'wide.tga', data: tgaForRaw(makeRectImage(100, 12, 2))},
+    ])
+
+    const dir = await tmp()
+    await extractArchiveDir(bytes, dir)
 
     const rebuilt = await buildArchiveDirTexture(dir)
     expect(rebuilt).toEqual(bytes)
