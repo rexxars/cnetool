@@ -10,8 +10,11 @@ import {
   encodePng,
   formatServerInfo,
   formatStatTable,
+  obfuscate,
   pngToTga,
   serializeMesh,
+  setStatField,
+  STAT_CHUNK_SIZE,
 } from '../src/index.ts'
 import type {Mesh, RawImage} from '../src/index.ts'
 import {buildProject} from '../src/project/build.ts'
@@ -155,9 +158,12 @@ async function makeInstall(dir: string): Promise<void> {
       {key: 'Health', value: '100'},
     ]),
   )
+  // Real weapon/unit tables carry BINARY payload (damage/ballistics) in each
+  // 127-byte chunk past the `Key:Value` line. Give data4.bin such tails so the
+  // build's base-overlay preservation is actually exercised.
   await write(
     'data4.bin',
-    formatStatTable([
+    statTableWithBinaryTail([
       {key: 'Name', value: 'Rifle'},
       {key: 'Damage', value: '25'},
     ]),
@@ -182,6 +188,20 @@ async function makeInstall(dir: string): Promise<void> {
   await write('level128/data1.bin', new Uint8Array([10, 20, 30, 40, 50]))
 
   await write('wcache.bin', new Uint8Array([0xde, 0xad, 0xbe, 0xef]))
+}
+
+// A stat table whose chunks carry non-text binary bytes AFTER the `Key:Value`
+// line — mirrors real data3/data4.bin, which store damage/ballistics tables in
+// the chunk tail. Built by filling every chunk with a non-zero pattern, then
+// overlaying the field lines with setStatField (leaving the tails intact).
+function statTableWithBinaryTail(fields: Array<{key: string; value: string}>): Uint8Array {
+  const plain = new Uint8Array(fields.length * STAT_CHUNK_SIZE)
+  for (let i = 0; i < plain.length; i++) plain[i] = (i * 7 + 3) & 0xff
+  let data = obfuscate(plain)
+  fields.forEach((field, i) => {
+    data = setStatField(data, i, field.key, field.value)
+  })
+  return data
 }
 
 function latin1Bytes(value: string): Uint8Array {
@@ -336,5 +356,79 @@ describe('project init/build round-trip', () => {
     await buildProject(project)
 
     expect(await exists(stale)).toBe(false)
+  })
+
+  test('an unmodified stat table with a binary tail round-trips byte-identically', async () => {
+    const install = await tmp()
+    const project = await tmp()
+    await makeInstall(install)
+
+    await initProject(install, project)
+    // The base was captured at init; build overlays the JSON fields onto it.
+    expect(await exists(join(project, '.cnetool', 'base', 'data4.bin'))).toBe(true)
+
+    await buildProject(project)
+
+    const original = await readFile(join(install, 'data4.bin'))
+    const rebuilt = await readFile(join(project, 'output', 'data4.bin'))
+    expect(Buffer.compare(original, rebuilt)).toBe(0)
+    // Sanity: the fixture genuinely carries non-zero bytes past the Key:Value text.
+    const tail = original.subarray(STAT_CHUNK_SIZE - 16, STAT_CHUNK_SIZE)
+    expect(tail.some((byte) => byte !== 0)).toBe(true)
+  })
+
+  test('.cnetool/base/ is committed (not matched by the generated .gitignore)', async () => {
+    const install = await tmp()
+    const project = await tmp()
+    await makeInstall(install)
+
+    await initProject(install, project)
+    const gitignore = await readFile(join(project, '.gitignore'), 'utf8')
+    expect(gitignore).toBe('output/\n.cnetool/cache.json\n')
+    expect(gitignore).not.toContain('base')
+  })
+
+  test('a failed init leaves no cnetool.json, so re-init works', async () => {
+    const bad = await tmp()
+    const project = await tmp()
+    await makeInstall(bad)
+    // Corrupt a texture archive so extraction throws partway through init.
+    await writeFile(join(bad, '24bits', 'textures.dat'), new Uint8Array(8).fill(0xff))
+
+    await expect(initProject(bad, project)).rejects.toThrow()
+    // Manifest must NOT exist — otherwise re-running init is blocked.
+    expect(await exists(join(project, 'cnetool.json'))).toBe(false)
+
+    // Re-init into the SAME (now manifest-less) dir from a good install succeeds.
+    const good = await tmp()
+    await makeInstall(good)
+    await initProject(good, project)
+    expect(await exists(join(project, 'cnetool.json'))).toBe(true)
+  })
+
+  test('build prunes stale/orphaned files from output/', async () => {
+    const install = await tmp()
+    const project = await tmp()
+    await makeInstall(install)
+
+    await initProject(install, project)
+    await buildProject(project)
+
+    // Drop files whose source no longer exists (deleted/renamed sources).
+    const orphanTop = join(project, 'output', 'oldtexture.dat')
+    const orphanNested = join(project, 'output', 'raw', 'gone.bin')
+    await writeFile(orphanTop, new Uint8Array([1, 2, 3]))
+    await mkdir(join(orphanNested, '..'), {recursive: true})
+    await writeFile(orphanNested, new Uint8Array([4, 5, 6]))
+
+    await buildProject(project)
+
+    expect(await exists(orphanTop)).toBe(false)
+    expect(await exists(orphanNested)).toBe(false)
+    // Legitimate outputs remain.
+    const output = join(project, 'output')
+    expect(await exists(join(output, 'data4.bin'))).toBe(true)
+    expect(await exists(join(output, 'menuinfo.dat'))).toBe(true)
+    expect(await exists(join(output, 'sounds', 'fx', 'shot.wav'))).toBe(true)
   })
 })

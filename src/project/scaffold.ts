@@ -2,6 +2,8 @@
 import {access, copyFile, mkdir, readdir, readFile, writeFile} from 'node:fs/promises'
 import {join} from 'node:path'
 
+import {isEnoent} from './fsutil.ts'
+
 export interface ProjectManifest {
   game: string
   deploy?: string
@@ -19,11 +21,8 @@ const SOURCE_SUBDIRS = [
   'raw',
 ]
 
-function isEnoent(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT'
-}
-
-async function fileExists(path: string): Promise<boolean> {
+/** Whether a filesystem path is accessible (used to detect an existing manifest). */
+export async function fileExists(path: string): Promise<boolean> {
   try {
     await access(path)
     return true
@@ -76,6 +75,34 @@ export async function readManifest(projectDir: string): Promise<ProjectManifest>
   return manifest
 }
 
+/**
+ * Create a project's directory skeleton: the `source/` subdirs, `output/`,
+ * `.cnetool/schemas/`, and the `.gitignore`. Everything except the manifest, so
+ * that `initProject` can lay down the tree, run all extraction, and only then
+ * commit the `cnetool.json` — a mid-init failure leaves no manifest to block a
+ * re-run.
+ */
+export async function createSkeleton(projectDir: string): Promise<void> {
+  for (const sub of SOURCE_SUBDIRS) {
+    await mkdir(join(projectDir, 'source', sub), {recursive: true})
+  }
+  await mkdir(join(projectDir, 'output'), {recursive: true})
+  await mkdir(join(projectDir, '.cnetool', 'schemas'), {recursive: true})
+  await writeFile(join(projectDir, '.gitignore'), 'output/\n.cnetool/cache.json\n')
+}
+
+/** Write the `cnetool.json` manifest (`$schema`, `game`, optional `deploy`). */
+export async function writeManifest(projectDir: string, manifest: ProjectManifest): Promise<void> {
+  const contents: Record<string, string> = {
+    $schema: './.cnetool/schemas/cnetool.schema.json',
+    game: manifest.game,
+  }
+  if (manifest.deploy !== undefined) {
+    contents.deploy = manifest.deploy
+  }
+  await writeFile(join(projectDir, 'cnetool.json'), `${JSON.stringify(contents, null, 2)}\n`)
+}
+
 export async function scaffoldProject(
   projectDir: string,
   manifest: ProjectManifest,
@@ -85,22 +112,8 @@ export async function scaffoldProject(
     throw new Error(`${projectDir} is already a cnetool project.`)
   }
 
-  for (const sub of SOURCE_SUBDIRS) {
-    await mkdir(join(projectDir, 'source', sub), {recursive: true})
-  }
-  await mkdir(join(projectDir, 'output'), {recursive: true})
-  await mkdir(join(projectDir, '.cnetool', 'schemas'), {recursive: true})
-
-  const contents: Record<string, string> = {
-    $schema: './.cnetool/schemas/cnetool.schema.json',
-    game: manifest.game,
-  }
-  if (manifest.deploy !== undefined) {
-    contents.deploy = manifest.deploy
-  }
-  await writeFile(manifestPath, `${JSON.stringify(contents, null, 2)}\n`)
-
-  await writeFile(join(projectDir, '.gitignore'), 'output/\n.cnetool/cache.json\n')
+  await createSkeleton(projectDir)
+  await writeManifest(projectDir, manifest)
 }
 
 export async function copySchemas(projectDir: string): Promise<void> {

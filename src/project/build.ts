@@ -1,18 +1,18 @@
 // @env node
-import {mkdir, readFile, rm, stat, writeFile} from 'node:fs/promises'
-import {basename, dirname, join} from 'node:path'
+import {mkdir, readdir, readFile, rm, rmdir, stat, writeFile} from 'node:fs/promises'
+import {basename, dirname, join, relative, sep} from 'node:path'
 
 import {
   formatMenuInfo,
   formatServerInfo,
   formatStatTable,
-  type ConfigEntry,
+  setStatField,
   type MenuInfo,
   type ServerInfo,
 } from '../api/index.ts'
 import {buildArchiveDirTexture} from './archive-dir.ts'
 import {isFresh, loadCache, putEntry, saveCache, type BuildCache} from './cache.ts'
-import {copyThrough, pathExists, walkFiles} from './fsutil.ts'
+import {copyThrough, isEnoent, pathExists, walkFiles} from './fsutil.ts'
 import {
   CONFIG_FILES,
   OBJECT_ARCHIVES,
@@ -60,68 +60,139 @@ export async function buildProject(projectDir: string, options: BuildOptions = {
     if (isEngineGenerated(basename(rel))) await rm(join(outputDir, rel))
   }
 
-  await buildTextures(sourceDir, outputDir)
-  await buildStats(sourceDir, outputDir)
-  await buildSettings(projectDir, sourceDir, outputDir)
-  await buildConfig(sourceDir, outputDir)
-  await buildObjects(sourceDir, outputDir)
-  await buildCopyThrough(sourceDir, outputDir, cache)
+  // Every output relpath this run produces; used below to prune orphans.
+  const produced = new Set<string>()
+
+  await buildTextures(sourceDir, outputDir, produced)
+  await buildStats(projectDir, sourceDir, outputDir, produced)
+  await buildSettings(projectDir, sourceDir, outputDir, produced)
+  await buildConfig(sourceDir, outputDir, produced)
+  await buildObjects(sourceDir, outputDir, produced)
+  await buildCopyThrough(sourceDir, outputDir, cache, produced)
+
+  // Prune orphans: files whose source was deleted/renamed since the last build.
+  // Without this, output/ drifts from source/ and the "complete install" would
+  // accumulate phantom files. Independent of the cache-skip optimization above.
+  for (const rel of await walkFiles(outputDir)) {
+    if (!produced.has(rel)) await rm(join(outputDir, rel))
+  }
+  await removeEmptyDirs(outputDir)
 
   if (cache !== undefined) await saveCache(cachePath, cache)
 }
 
-async function buildTextures(sourceDir: string, outputDir: string): Promise<void> {
+async function buildTextures(
+  sourceDir: string,
+  outputDir: string,
+  produced: Set<string>,
+): Promise<void> {
   for (const spec of TEXTURE_ARCHIVES) {
     const dir = join(sourceDir, 'textures', spec.sourceDir)
     if (!(await pathExists(dir))) continue
     const bytes = await buildArchiveDirTexture(dir)
-    await writeOutput(join(outputDir, spec.installPath), bytes)
+    await writeOutput(outputDir, join(outputDir, spec.installPath), bytes, produced)
   }
 }
 
-async function buildStats(sourceDir: string, outputDir: string): Promise<void> {
+async function buildStats(
+  projectDir: string,
+  sourceDir: string,
+  outputDir: string,
+  produced: Set<string>,
+): Promise<void> {
+  const baseDir = join(projectDir, '.cnetool', 'base')
   for (const spec of STAT_TABLES) {
     const path = join(sourceDir, 'stats', spec.source)
     if (!(await pathExists(path))) continue
     const fields = readStatFields(await readFile(path, 'utf8'), spec.source)
-    await writeOutput(join(outputDir, spec.file), formatStatTable(fields))
+    const base = await readFileOrNull(join(baseDir, spec.file))
+    await writeOutput(
+      outputDir,
+      join(outputDir, spec.file),
+      rebuildStatTable(fields, base),
+      produced,
+    )
   }
+}
+
+/**
+ * Rebuild a stat-table blob. When a pristine base exists (`.cnetool/base/<file>`,
+ * captured at init), overlay each field's text onto it with {@link setStatField},
+ * preserving the binary ballistics/damage tables the chunks carry past the
+ * `Key:Value` line — byte-identical for an unmodified project. Only when no base
+ * is present (e.g. a hand-authored stat file with no original) does it fall back
+ * to {@link formatStatTable}, which zero-fills the chunk tails; that path is
+ * best-effort and can't preserve binary payload it never saw.
+ */
+function rebuildStatTable(fields: StatFieldInput[], base: Uint8Array | null): Uint8Array {
+  if (base === null) return formatStatTable(fields)
+  let data = base
+  for (const field of fields) {
+    if (field.chunk === undefined) {
+      throw new Error(
+        `stat field "${field.key}" has no "chunk" index; cannot overlay onto the base — re-run "cnetool init" or add a numeric "chunk".`,
+      )
+    }
+    data = setStatField(data, field.chunk, field.key, field.value)
+  }
+  return data
 }
 
 async function buildSettings(
   projectDir: string,
   sourceDir: string,
   outputDir: string,
+  produced: Set<string>,
 ): Promise<void> {
   const menuInfoPath = join(sourceDir, 'settings', 'menuinfo.json')
   if (await pathExists(menuInfoPath)) {
     const info = readMenuInfo(await readFile(menuInfoPath, 'utf8'))
     const base = await readFile(join(projectDir, '.cnetool', 'base', 'menuinfo.dat'))
-    await writeOutput(join(outputDir, 'menuinfo.dat'), formatMenuInfo(base, menuInfoToPatch(info)))
+    await writeOutput(
+      outputDir,
+      join(outputDir, 'menuinfo.dat'),
+      formatMenuInfo(base, menuInfoToPatch(info)),
+      produced,
+    )
   }
 
   const servInfoPath = join(sourceDir, 'settings', 'servinfo.json')
   if (await pathExists(servInfoPath)) {
     const info = readServerInfo(await readFile(servInfoPath, 'utf8'))
-    await writeOutput(join(outputDir, 'servinfo.dat'), formatServerInfo(info))
+    await writeOutput(outputDir, join(outputDir, 'servinfo.dat'), formatServerInfo(info), produced)
   }
 }
 
-async function buildObjects(sourceDir: string, outputDir: string): Promise<void> {
+async function buildObjects(
+  sourceDir: string,
+  outputDir: string,
+  produced: Set<string>,
+): Promise<void> {
   for (const archive of OBJECT_ARCHIVES) {
     const dir = join(sourceDir, 'objects', archive.toLowerCase())
     if (!(await pathExists(dir))) continue
-    await writeOutput(join(outputDir, archive.toLowerCase()), await buildObjectsArchive(dir))
+    await writeOutput(
+      outputDir,
+      join(outputDir, archive.toLowerCase()),
+      await buildObjectsArchive(dir),
+      produced,
+    )
   }
 }
 
-async function buildConfig(sourceDir: string, outputDir: string): Promise<void> {
+async function buildConfig(
+  sourceDir: string,
+  outputDir: string,
+  produced: Set<string>,
+): Promise<void> {
   for (const spec of CONFIG_FILES) {
     const path = join(sourceDir, 'config', spec.source)
     if (!(await pathExists(path))) continue
     const text = latin1.decode(await readFile(path))
-    await mkdir(join(outputDir, spec.file, '..'), {recursive: true})
-    await writeFile(join(outputDir, spec.file), text, 'latin1')
+    const dest = join(outputDir, spec.file)
+    await mkdir(dirname(dest), {recursive: true})
+    await writeFile(dest, text, 'latin1')
+    produced.add(toRel(outputDir, dest))
   }
 }
 
@@ -129,20 +200,27 @@ async function buildCopyThrough(
   sourceDir: string,
   outputDir: string,
   cache: BuildCache | undefined,
+  produced: Set<string>,
 ): Promise<void> {
   const soundsSrc = join(sourceDir, 'sounds')
   for (const rel of await walkFiles(soundsSrc)) {
-    await copyCached(join(soundsSrc, rel), join(outputDir, 'sounds', rel), `sounds/${rel}`, cache)
+    const dest = join(outputDir, 'sounds', rel)
+    await copyCached(join(soundsSrc, rel), dest, `sounds/${rel}`, cache)
+    produced.add(toRel(outputDir, dest))
   }
 
   const animSrc = join(sourceDir, 'animations')
   for (const rel of await walkFiles(animSrc)) {
-    await copyCached(join(animSrc, rel), join(outputDir, 'anm', rel), `animations/${rel}`, cache)
+    const dest = join(outputDir, 'anm', rel)
+    await copyCached(join(animSrc, rel), dest, `animations/${rel}`, cache)
+    produced.add(toRel(outputDir, dest))
   }
 
   const rawSrc = join(sourceDir, 'raw')
   for (const rel of await walkFiles(rawSrc)) {
-    await copyCached(join(rawSrc, rel), join(outputDir, rel), `raw/${rel}`, cache)
+    const dest = join(outputDir, rel)
+    await copyCached(join(rawSrc, rel), dest, `raw/${rel}`, cache)
+    produced.add(toRel(outputDir, dest))
   }
 }
 
@@ -168,9 +246,51 @@ async function copyCached(
   await copyThrough(src, dest)
 }
 
-async function writeOutput(path: string, bytes: Uint8Array): Promise<void> {
+async function writeOutput(
+  outputDir: string,
+  path: string,
+  bytes: Uint8Array,
+  produced: Set<string>,
+): Promise<void> {
   await mkdir(dirname(path), {recursive: true})
   await writeFile(path, bytes)
+  produced.add(toRel(outputDir, path))
+}
+
+/** An output path relative to `outputDir`, as a stable forward-slash relpath. */
+function toRel(outputDir: string, path: string): string {
+  return relative(outputDir, path).split(sep).join('/')
+}
+
+/** Read a file's bytes, or `null` when it does not exist. */
+async function readFileOrNull(path: string): Promise<Uint8Array | null> {
+  try {
+    return await readFile(path)
+  } catch (error) {
+    if (isEnoent(error)) return null
+    throw error
+  }
+}
+
+/**
+ * Recursively remove now-empty directories under `root` (bottom-up), leaving
+ * `root` itself in place. Run after pruning orphaned files so directories whose
+ * last file was deleted don't linger in the output tree.
+ */
+async function removeEmptyDirs(root: string): Promise<void> {
+  let entries
+  try {
+    entries = await readdir(root, {withFileTypes: true})
+  } catch (error) {
+    if (isEnoent(error)) return
+    throw error
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    const full = join(root, entry.name)
+    await removeEmptyDirs(full)
+    if ((await readdir(full)).length === 0) await rmdir(full)
+  }
 }
 
 // --- JSON coercion (type-safe: narrow via guards, never assert) ---
@@ -202,9 +322,20 @@ function bool(record: Record<string, unknown>, key: string, label: string): bool
   return value
 }
 
-// `formatStatTable` consumes only {key, value}; the `chunk` index (written by
-// init as metadata) is ignored on rebuild, so it is optional in hand-authored JSON.
-function readStatFields(raw: string, source: string): ConfigEntry[] {
+/** A stat field read from source JSON: `key`/`value`, plus the `chunk` index the
+ * base-overlay rebuild needs to place it (optional — only the no-base fallback,
+ * {@link formatStatTable}, can proceed without it). */
+interface StatFieldInput {
+  key: string
+  value: string
+  chunk?: number
+}
+
+// The `chunk` index (written by init) is required to overlay onto the pristine
+// base; it stays optional here so a hand-authored stat file without a base can
+// still fall back to `formatStatTable`. `rebuildStatTable` enforces its presence
+// when a base exists.
+function readStatFields(raw: string, source: string): StatFieldInput[] {
   const label = `stats source ${source}`
   const record = asRecord(parseJson(raw, label), label)
   const {fields} = record
@@ -212,10 +343,14 @@ function readStatFields(raw: string, source: string): ConfigEntry[] {
   return fields.map((entry, index) => {
     const fieldLabel = `${label} field ${index}`
     const field = asRecord(entry, fieldLabel)
-    return {
+    const result: StatFieldInput = {
       key: str(field, 'key', fieldLabel),
       value: str(field, 'value', fieldLabel),
     }
+    if ('chunk' in field && field.chunk !== undefined) {
+      result.chunk = num(field, 'chunk', fieldLabel)
+    }
+    return result
   })
 }
 

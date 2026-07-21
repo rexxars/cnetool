@@ -4,7 +4,7 @@ import {basename, join} from 'node:path'
 
 import {parseMenuInfo, parseServerInfo, parseStatTable} from '../api/index.ts'
 import {extractArchiveDir} from './archive-dir.ts'
-import {copyThrough, walkFiles} from './fsutil.ts'
+import {copyThrough, pathExists, walkFiles} from './fsutil.ts'
 import {
   CONFIG_FILES,
   OBJECT_ARCHIVES,
@@ -13,7 +13,7 @@ import {
   isEngineGenerated,
 } from './layout.ts'
 import {extractObjectsArchive} from './objects-dir.ts'
-import {copySchemas, scaffoldProject} from './scaffold.ts'
+import {copySchemas, createSkeleton, writeManifest} from './scaffold.ts'
 
 const latin1 = new TextDecoder('latin1')
 
@@ -52,7 +52,13 @@ function isAnimation(key: string): boolean {
  * @param projectDir - The (new) project directory to create.
  */
 export async function initProject(gameDir: string, projectDir: string): Promise<void> {
-  await scaffoldProject(projectDir, {game: gameDir})
+  // Refuse to clobber an existing project. The manifest is written LAST (below),
+  // so a failure partway through extraction leaves no cnetool.json — a re-run of
+  // `cnetool init` into the same directory is not blocked by a stale manifest.
+  if (await pathExists(join(projectDir, 'cnetool.json'))) {
+    throw new Error(`${projectDir} is already a cnetool project.`)
+  }
+  await createSkeleton(projectDir)
   await copySchemas(projectDir)
 
   // Map lowercase-relative-path -> real absolute path (installs mix case).
@@ -70,16 +76,22 @@ export async function initProject(gameDir: string, projectDir: string): Promise<
     await extractArchiveDir(bytes, join(texturesRoot, spec.sourceDir))
   }
 
-  // 2. Stat tables -> source/stats/<source> (JSON)
+  // 2. Stat tables -> source/stats/<source> (JSON) + pristine base for overlay.
+  // Build re-applies the JSON fields onto the original bytes (which carry binary
+  // ballistics/damage tables past the Key:Value text), so the base must be kept.
   const statsRoot = join(projectDir, 'source', 'stats')
+  const baseDir = join(projectDir, '.cnetool', 'base')
   for (const spec of STAT_TABLES) {
     const abs = claim(map, spec.file.toLowerCase())
     if (abs === undefined) continue
-    const fields = parseStatTable(await readFile(abs))
+    const bytes = await readFile(abs)
+    const fields = parseStatTable(bytes)
     await writeJson(join(statsRoot, spec.source), {
       $schema: '../../.cnetool/schemas/stats.schema.json',
       fields,
     })
+    await mkdir(baseDir, {recursive: true})
+    await writeFile(join(baseDir, spec.file), bytes)
   }
 
   // 3. Settings -> source/settings/*.json (+ pristine menuinfo base)
@@ -92,7 +104,6 @@ export async function initProject(gameDir: string, projectDir: string): Promise<
       $schema: '../../.cnetool/schemas/menuinfo.schema.json',
       ...info,
     })
-    const baseDir = join(projectDir, '.cnetool', 'base')
     await mkdir(baseDir, {recursive: true})
     await writeFile(join(baseDir, 'menuinfo.dat'), bytes)
   }
@@ -139,4 +150,8 @@ export async function initProject(gameDir: string, projectDir: string): Promise<
       await copyThrough(abs, join(rawRoot, key))
     }
   }
+
+  // Manifest last: only a fully-extracted project gets a cnetool.json, so a
+  // mid-init failure never leaves a project that blocks re-running init.
+  await writeManifest(projectDir, {game: gameDir})
 }
