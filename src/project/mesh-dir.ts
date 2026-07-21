@@ -84,18 +84,20 @@ export async function extractMeshDir(
   for (const face of distinct.flatMap((layer) => layer.faces)) nameFor(face)
   if (detect) for (const face of detect.faces) nameFor(face)
 
-  await mkdir(dir, {recursive: true})
+  // Derive every file's bytes BEFORE touching the filesystem, so any failure
+  // (bad geometry, etc) throws with nothing written - no orphaned partial dir.
+  const files: Array<{file: string; content: string}> = []
   for (let i = 0; i < distinct.length; i++) {
     const obj = meshToObj(sliceLayer(distinct[i]!), {
       up: 'raw',
       mtllib: MTL_FILE,
       material: nameFor,
     })
-    await writeFile(join(dir, LOD_FILES[i]!), obj)
+    files.push({file: LOD_FILES[i]!, content: obj})
   }
   if (detect) {
     const obj = meshToObj(sliceLayer(detect), {up: 'raw', mtllib: MTL_FILE, material: nameFor})
-    await writeFile(join(dir, DETECT_FILE), obj)
+    files.push({file: DETECT_FILE, content: obj})
   }
 
   const mtlMaterials: MtlMaterial[] = [...materials.values()].map(({name: mName, record}) => {
@@ -103,12 +105,17 @@ export async function extractMeshDir(
     if (record.texture !== null) material.map = record.texture
     return material
   })
-  await writeFile(join(dir, MTL_FILE), buildMtl(mtlMaterials))
+  files.push({file: MTL_FILE, content: buildMtl(mtlMaterials)})
 
   const materialsJson: Record<string, MaterialRecord> = {}
   for (const {name: mName, record} of materials.values()) materialsJson[mName] = record
+  // `name` here is informational; on rebuild the authoritative entry name comes
+  // from the archive's entries.json, not from project.json.
   const document = {$schema: PROJECT_SCHEMA_REF, name, materials: materialsJson}
-  await writeFile(join(dir, 'project.json'), `${JSON.stringify(document, null, 2)}\n`)
+  files.push({file: 'project.json', content: `${JSON.stringify(document, null, 2)}\n`})
+
+  await mkdir(dir, {recursive: true})
+  for (const {file, content} of files) await writeFile(join(dir, file), content)
 }
 
 /**

@@ -2,7 +2,13 @@
 import {mkdir, readFile, writeFile} from 'node:fs/promises'
 import {basename, isAbsolute, join} from 'node:path'
 
-import {buildArchive, extractFile, parseArchive, parseObjectTextures} from '../api/index.ts'
+import {
+  buildArchive,
+  extractFile,
+  parseArchive,
+  parseMeshLayers,
+  parseObjectTextures,
+} from '../api/index.ts'
 import type {ArchiveInputEntry} from '../api/index.ts'
 import {slugify} from './layout.ts'
 import {buildMeshDir, extractMeshDir} from './mesh-dir.ts'
@@ -36,6 +42,9 @@ export async function extractObjectsArchive(data: Uint8Array, dir: string): Prom
   await mkdir(dir, {recursive: true})
   const {entries} = parseArchive(data)
   const textureNames = parseObjectTextures(data)
+  // Material references are by texture NAME, resolved back to a texId via this
+  // table's index on rebuild - which is only unambiguous if names are unique.
+  assertUniqueTextureNames(textureNames)
 
   await writeFile(
     join(dir, 'textures.json'),
@@ -47,15 +56,17 @@ export async function extractObjectsArchive(data: Uint8Array, dir: string): Prom
   for (const entry of entries) {
     const blob = extractFile(data, entry)
     const slug = uniqueSlug(entry.name, used)
-    try {
-      await extractMeshDir(blob, join(dir, slug), textureNames, entry.name)
-      records.push({name: entry.name, kind: 'mesh', dir: slug})
-    } catch {
-      // Not a mesh (empty stub / other payload): keep the raw bytes verbatim.
+    // Classify explicitly: a blob with no render geometry is a raw entry; anything
+    // else is a mesh, and any error from extractMeshDir is a real bug we let surface
+    // (rather than silently degrading an editable model to an opaque blob).
+    if (parseMeshLayers(blob, 1).length === 0) {
       const file = join(RAW_SUBDIR, `${slug}.bin`)
       await mkdir(join(dir, RAW_SUBDIR), {recursive: true})
       await writeFile(join(dir, file), blob)
       records.push({name: entry.name, kind: 'raw', file: toPosix(file)})
+    } else {
+      await extractMeshDir(blob, join(dir, slug), textureNames, entry.name)
+      records.push({name: entry.name, kind: 'mesh', dir: slug})
     }
   }
 
@@ -93,6 +104,28 @@ export async function buildObjectsArchive(dir: string): Promise<Uint8Array> {
   return buildArchive(entries, {textures: textureNames})
 }
 
+/**
+ * Reject a texture-name table with duplicate (non-empty) names: material
+ * references resolve name → texId by table index, so a duplicate would silently
+ * collapse two distinct texIds on rebuild. Empty slots are ignored (an untextured
+ * face carries `texture: null`, not an empty-string name).
+ */
+function assertUniqueTextureNames(names: string[]): void {
+  const seen = new Set<string>()
+  const duplicates = new Set<string>()
+  for (const name of names) {
+    if (name.length === 0) continue
+    if (seen.has(name)) duplicates.add(name)
+    else seen.add(name)
+  }
+  if (duplicates.size > 0) {
+    throw new Error(
+      `texture-name table has duplicate names (${[...duplicates].join(', ')}); ` +
+        `material references resolve by name and would be ambiguous`,
+    )
+  }
+}
+
 /** Convert an entry name to a unique lowercase directory slug within `used`. */
 function uniqueSlug(name: string, used: Set<string>): string {
   const base = slugify(name) || 'entry'
@@ -120,6 +153,7 @@ async function readTextures(dir: string): Promise<string[]> {
   if (!Array.isArray(textures) || !textures.every((t): t is string => typeof t === 'string')) {
     throw new Error(`Invalid textures.json in ${dir}: "textures" must be an array of strings.`)
   }
+  assertUniqueTextureNames(textures)
   return textures
 }
 
