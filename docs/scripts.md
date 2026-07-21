@@ -459,7 +459,7 @@ Confidence: **Confirmed** = verified at an engine read site; **Likely** = strong
 
 #### `WEAPON_TYPE` ids
 
-Names are the developers' own, decoded verbatim from `data4.bin` (SP) / `mdata4.bin` (MP). At fire time (`0x44e6b0`) the weapon's id selects the stats row, and the spawned **projectile's own `+0x2b2` is overwritten with the row's ammo class** (0=bullet, 1=gas, 2=shell) - the damage handler then feeds that class into a 3×3 armor-damage matrix from the WpnInfo header (bullets do 11/21/100 % vs heavy/light/no armor; gas and shells 100 across).
+Names are the developers' own, decoded verbatim from `data4.bin` (SP) / `mdata4.bin` (MP). The id is a **row index by position** - `WEAPON_TYPE n` reads the record at file position `n`, and the `Name` is only a cosmetic label. At fire time (`0x44e6b0`) the weapon's id selects the stats row, and the spawned **projectile's own `+0x2b2` is overwritten with the row's ammo class** (its `AmmoType`: 0=bullet, 1=gas, 2=shell). The damage handler then feeds that class into the 3×3 armor-damage matrix in the table header: **final hit damage = round(row `Damage` × matrix[ammoType][target armor] / 100)** (bullets do 11/21/100 % vs heavy/light/no armor; gas and shells 100 across). Full field layout, the damage formula, and the loader addresses are in [`formats.md` § obfuscated stat tables](./formats.md#data3bin-data4bin---obfuscated-stat-tables).
 
 | id  | WpnInfo name                  | Set by (object script)                       | Notes                                                                              |
 | --- | ----------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------- |

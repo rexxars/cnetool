@@ -532,17 +532,38 @@ Each line carries **two** keys (`Name:` and `Val:`), so the generic `parseConfig
 
 ### `data3.bin`, `data4.bin` - obfuscated stat tables
 
-The game's balance tables, stored as `Key:Value` text **obfuscated by adding `0x78` to every byte** (decode by subtracting it; see `deobfuscate`).
+The game's balance tables (units in `data3.bin`, weapons in `data4.bin`), stored as `Key:Value` text **obfuscated by adding `0x78` to every byte**. The engine deobfuscates with `StatDeobfuscate` (`0x4293f0`) and re-obfuscates with `StatObfuscate`; `cnetool`'s `deobfuscate`/`obfuscate` are the inverse pair.
 
-Read/write them with the dedicated `stattable` helpers, which understand the 127-byte-slot layout below: `parseStatTable(bytes)` returns one located field per slot (`{key, value, chunk}`); `groupRecords(fields, 'Name')` splits those into records (a weapon's class index = its record position); `setStatValue(bytes, chunk, value)` / `setStatField(bytes, chunk, key, value)` rewrite one field's value in place (chunk-sized, other slots preserved byte-for-byte - the engine `sscanf`s the text so any length that fits works); `formatStatTable(fields)` rebuilds a whole table. (For a quick read-only pass you can still use `parseConfig`'s `scan` mode, which just matches `Key:Value` pairs and skips the non-text bytes, but it carries no slot positions and can't write.)
+**Layout - 127-byte field slots (`0x7f`).** After deobfuscation the file is a packed array of **127-byte slots**, one field per slot. Each slot holds a NUL-terminated `Key:Value\n` line at the front; everything after the `0x00` terminator is ignored filler. **The literal `0x00` terminator is load-bearing:** `StatDeobfuscate` scans each slot `while (byte != 0)` with no length bound, so a slot that lacks a `0x00` byte reads off the end. (`cnetool`'s serializer emits the obfuscated line, one raw `0x00`, then zero filler - the terminator stays a literal `0x00`, only the text is obfuscated.) The stats are entirely the text values; there is no hidden binary numeric payload past the text. File length is always a multiple of 127.
 
-**Layout - fixed 127-byte field slots.** After deobfuscation the file is a packed array of **127-byte slots**, one per field. A slot holds its `Key:Value\n` text at the front, then a **constant filler template** to pad it to 127 bytes (the same byte pattern in every slot, including a recurring `Vk.` sentinel at slot offset 68). The filler is _not_ per-record data: across all records, a slot's bytes past the text are byte-for-byte identical - the only bytes that vary between records are the `Key:Value` text itself. So the stats are entirely the text values; there are no hidden binary numeric fields. A record is a fixed run of slots (`data3`/`mdata3` = 4 slots = 508 bytes; `data4` = 102 slots, `mdata4` = 116, each an exact multiple of 127).
+The engine parses each slot with `sscanf` against a **hardcoded key per line, read in fixed order**: field order and the exact case-sensitive keys are load-bearing. Units and weapons even disagree on casing - units use `Firedelay` (lowercase `d`), weapons use `FireDelay` (capital `D`).
 
-- `data3.bin` - **56 unit/entity records**: `Name`, `Armor`, `Health`, `Firedelay` (eg `airplane` → Light / 75 / 2). Names: `airplane`, `tank`, `vakt1`… (`vakt` = Swedish "guard"), `gasguard`, `sailor`, etc.
-- `data4.bin` - weapon records: `Name`, `Damage`, `AmmoSpeed`, `FireDelay`, `AmmoType`, `WeaponLength`, `Sound`, plus damage-vs-armor tables (`gas`/`bullet`/`shell`). The `Sound:` values reference the `SOUNDS/` tree (eg `Sounds\FX\WFiFire.WAV`).
-- `mdata3.bin` / `mdata4.bin` (**multiplayer patches**, 1.33+) - the MP counterparts. `mdata3` holds the 16 player-controllable `my_*` units (`my_tank`, `my_plane`, and 1.41's new `my_car2`, `my_plane3`, `my_plane4`); `mdata4` the MP weapon set.
+**`data3.bin` / `mdata3.bin` - unit records** (loader `LoadUnitInfo` `0x429430`). Each unit is a `Name`-delimited run of slots in the order `Name`, optional `Armor`, `Health`, `Firedelay`:
 
-The `data4`/`mdata4` **weapon classes** in record order - the class index is what scripts set via `REFSetProjectVars(MYSELF, WEAPON_TYPE, n)`, and `FireDelay` (seconds) is loaded into the holder's `+0x6c` as ticks (see `game-flow.md` § The fire pipeline). 1.43 values, SP (`data4`) / MP (`mdata4`):
+- `Name` - unit name, eg `airplane`, `tank`, `vakt1` (`vakt` = Swedish "guard"), `gasguard`, `sailor`.
+- `Armor` - `Heavy` / `Light` / `None` (matched case-insensitively via `stricmp`; `No` is accepted for `None`). **Optional** - a unit that omits the slot defaults to `None`.
+- `Health` - hit points (`%d`).
+- `Firedelay` - refire delay in seconds (`%f`).
+
+`data3.bin` holds ~56 unit/entity records; `mdata3.bin` (**multiplayer patch**, 1.33+) holds the 16 player-controllable `my_*` units (`my_tank`, `my_plane`, and 1.41's new `my_car2`, `my_plane3`, `my_plane4`).
+
+**`data4.bin` / `mdata4.bin` - weapon records** (loader `LoadWeaponInfo` `0x44dee0`). A **4-slot header** comes first, then the weapon records:
+
+- Header slot 0 is an ignored `Armor:` comment line (a human column legend - the engine never `sscanf`s it). Slots 1-3 are the `gas` / `bullet` / `shell` damage-vs-armor rows, each `%f,%f,%f` = the ammo type's percent effectiveness against a `Heavy` / `Light` / `None` target (e.g. bullets do 11 / 21 / 100 %; gas and shell 100 across).
+- Each weapon is a **7-slot** record in the fixed order `Name`, `AmmoSpeed`, `FireDelay` (capital `D`), `Damage`, `AmmoType`, `WeaponLength`, `Sound`. `Sound` values reference the `SOUNDS/` tree (eg `Sounds\FX\WFiFire.WAV`).
+
+Field meanings (all `%f` except the string fields):
+
+- **`Damage`** - per-weapon base damage. **`AmmoType`** (`bullet`/`gas`/`shell`, case-insensitive) selects which header row applies. **Final hit damage = round(`Damage` × `ammoDamage[AmmoType][target armor]` / 100)**, floored at 0 (`DamageVehicle` `0x436e10`; the matrix lookup `AmmoArmorDamageFactor` `0x44dea0` returns the file percentage × 0.01). This is why many `bullet` weapons differ: they share the one bullet armor curve but carry different `Damage` bases.
+- **`AmmoSpeed`** - projectile muzzle speed (world units per physics tick), applied along the aim direction (`ApplyWeaponStats` `0x44e6b0`).
+- **`WeaponLength`** - muzzle forward-offset: how far ahead of the shooter the projectile/muzzle-flash spawns (barrel length), **not range** (`GetWeaponLength` `0x44e820`).
+- **`FireDelay`** - refire delay in seconds, loaded into the holder's `+0x6c` as ticks (see `game-flow.md` § The fire pipeline).
+
+**Weapon selection is by record index, not name.** A script's `REFSetProjectVars(MYSELF, WEAPON_TYPE, n)` picks the weapon at position `n` (row at `n × 0x54`); the loader unpacks each record into a 0x54-byte struct with `FireDelay` at `+0x00`, `Damage` `+0x04`, `AmmoSpeed` `+0x08`, `AmmoType` `+0x0c`, `WeaponLength` `+0x10`, `Sound` `+0x14`. The `Name` is a cosmetic label (weapon 0's `0-GUN` / `0-DUMMY` is the engine default row). See [`WEAPON_TYPE` in scripts.md](./scripts.md#weapon_type-ids) for the class list.
+
+**cnetool's typed representation.** `cnetool init` extracts these into **typed, segmented JSON** (`stats/units.json`, `stats/weapons.json`, plus the `-mp` variants), and `cnetool build` re-serializes them - the codecs are `parseUnitTable`/`serializeUnitTable` and `parseWeaponTable`/`serializeWeaponTable`. `units.json` is `{units: [{name, armor?: heavy|light|none, health, fireDelay}]}`; `weapons.json` is `{ammoDamage: {bullet|gas|shell: {heavy, light, none}}, weapons: [{index, name, damage, ammoType, ammoSpeed, fireDelay, weaponLength, sound}]}` (armor/ammo values lowercased; `index` is read-only and must equal the array position). The round-trip is **load-equivalent, not byte-identical**: every value is preserved but number formatting and whitespace are normalized and the filler is rewritten as zeros. That is safe because the engine only ever `sscanf`s the text - any spelling that parses to the same numbers loads identically. (There is no `.cnetool/base/` copy for the stat tables; they rebuild entirely from the JSON. The lower-level `stattable` field helpers - `parseStatTable`, `setStatValue`, `formatStatTable` - remain for in-place single-field edits.)
+
+The `data4`/`mdata4` **weapon classes** in record order (the class index is the `WEAPON_TYPE` a script selects). 1.43 values, SP (`data4`) / MP (`mdata4`):
 
 | Class | Name                         | FireDelay SP/MP | AmmoSpeed SP/MP |
 | ----- | ---------------------------- | --------------- | --------------- |
@@ -564,8 +585,6 @@ The `data4`/`mdata4` **weapon classes** in record order - the class index is wha
 | 15    | - / MOUNTED_LIGHT_MACHINEGUN | - / 0.125       | - / 150         |
 
 Classes 14/15 exist only in `mdata4` (stock SP `data4` has 14 records - the source of the undefined-class-15 SP turret). Note the slot-7 pairing: the explosive stick is class 13, while its detonator (the `Detonat` project) is class **4**, the grenade class.
-
-The cipher, the text schema, and the 127-byte-slot layout are confirmed; there is no remaining undecoded binary payload.
 
 ### Per-level `data1.bin` - object placements
 
