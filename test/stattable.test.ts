@@ -5,11 +5,20 @@ import {
   formatStatTable,
   groupRecords,
   obfuscate,
+  packStatSlot,
   parseStatTable,
   setStatField,
   setStatValue,
   STAT_CHUNK_SIZE,
 } from '../src/index.ts'
+
+// Mimic the engine's unbounded deobfuscator: walk raw bytes `while (byte !== 0)`.
+// Returns the index of the terminating 0x00 (or the buffer length if none).
+function scanToTerminator(slot: Uint8Array): number {
+  let i = 0
+  while (i < slot.length && slot[i] !== 0) i++
+  return i
+}
 
 // Build an obfuscated fixed-chunk table from field lines, mimicking the game's
 // files: each field is one 0x7F-byte chunk (a `Key:Value` line + filler), and the
@@ -115,11 +124,56 @@ describe('setStatValue / setStatField', () => {
   })
 })
 
+describe('packStatSlot', () => {
+  test('emits a literal 0x00 terminator within the slot (engine-safe)', () => {
+    const slot = packStatSlot('Name:0-GUN')
+    expect(slot.length).toBe(STAT_CHUNK_SIZE)
+    // the engine's unbounded scan must stop inside the slot, not run off the end
+    expect(scanToTerminator(slot)).toBeLessThan(STAT_CHUNK_SIZE)
+  })
+
+  test('matches the stock slot layout (obfuscated text + newline, then NUL, then zeros)', () => {
+    const slot = packStatSlot('Name:0-GUN')
+    const nul = scanToTerminator(slot)
+    // deobfuscating just the text portion recovers the line with its trailing newline
+    const text = new TextDecoder('latin1').decode(deobfuscate(slot.subarray(0, nul)))
+    expect(text).toBe('Name:0-GUN\n')
+    // the byte after the text is a literal (un-obfuscated) 0x00
+    expect(slot[nul]).toBe(0x00)
+    // remainder is zero-filled
+    for (let i = nul + 1; i < STAT_CHUNK_SIZE; i++) expect(slot[i]).toBe(0x00)
+  })
+
+  test('throws a clear error when the record does not fit in a slot', () => {
+    // a `key:value` of >= 127 bytes cannot fit alongside the terminator
+    expect(() => packStatSlot('K'.repeat(200))).toThrow(RangeError)
+    expect(() => packStatSlot('K'.repeat(200))).toThrow(/exceed/i)
+  })
+})
+
 describe('formatStatTable', () => {
   test('round-trips fields functionally (chunk-sized, engine ignores filler)', () => {
     const fields = parseStatTable(buildTable(WEAPONS))
     const rebuilt = formatStatTable(fields)
     expect(rebuilt.length).toBe(WEAPONS.length * STAT_CHUNK_SIZE)
     expect(parseStatTable(rebuilt)).toEqual(fields)
+  })
+
+  test('output length is a multiple of the chunk size', () => {
+    const rebuilt = formatStatTable(parseStatTable(buildTable(WEAPONS)))
+    expect(rebuilt.length % STAT_CHUNK_SIZE).toBe(0)
+  })
+
+  test('every emitted slot has a NUL terminator (regression: no infinite deobfuscation)', () => {
+    const fields = parseStatTable(buildTable(WEAPONS))
+    const rebuilt = formatStatTable(fields)
+    for (let c = 0; c < WEAPONS.length; c++) {
+      const slot = rebuilt.subarray(c * STAT_CHUNK_SIZE, (c + 1) * STAT_CHUNK_SIZE)
+      expect(scanToTerminator(slot)).toBeLessThan(STAT_CHUNK_SIZE)
+    }
+  })
+
+  test('throws a clear error for an overlong field', () => {
+    expect(() => formatStatTable([{key: 'Sound', value: 'x'.repeat(200)}])).toThrow(RangeError)
   })
 })

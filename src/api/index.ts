@@ -94,6 +94,7 @@ export type {CompiledHandler, CompiledInstruction, Program} from './compile.ts'
 export {deobfuscate, obfuscate} from './obfuscation.ts'
 export {
   formatStatTable,
+  packStatSlot,
   parseStatTable,
   setStatField,
   setStatValue,

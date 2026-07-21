@@ -110,27 +110,53 @@ export function setStatValue(data: Uint8Array, chunk: number, value: string): Ui
 }
 
 /**
+ * Pack one record's `key:value` text (without a trailing newline - this appends
+ * it) into a single {@link STAT_CHUNK_SIZE}-byte slot, laid out exactly as the
+ * engine's stock tables store it: the obfuscated line (`key:value\n`, +0x78 per
+ * byte) followed by a single **literal** `0x00` terminator, then zero filler to
+ * {@link STAT_CHUNK_SIZE} bytes.
+ *
+ * Only the text is obfuscated; the terminator stays a raw `0x00`. This matters
+ * because the engine's deobfuscator walks the slot `while (byte !== 0)` with no
+ * length bound, so a slot with no `0x00` byte would read off the end. The line
+ * (including its newline) must fit in the first {@link STAT_CHUNK_SIZE}`- 1`
+ * bytes to leave room for that terminator.
+ *
+ * @throws RangeError if the `key:value` line does not fit alongside the terminator.
+ */
+export function packStatSlot(text: string): Uint8Array {
+  const line = latin1Bytes(`${text}\n`)
+  if (line.length > STAT_CHUNK_SIZE - 1) {
+    throw new RangeError(
+      `stat record "${text}" is ${line.length} bytes with its newline, exceeds the ${
+        STAT_CHUNK_SIZE - 1
+      }-byte limit (one byte is reserved for the NUL terminator)`,
+    )
+  }
+  const slot = new Uint8Array(STAT_CHUNK_SIZE)
+  // Obfuscate only the text; the terminator (slot[line.length]) and the filler
+  // stay a literal 0x00 (the array is already zero-initialised).
+  slot.set(obfuscate(line), 0)
+  return slot
+}
+
+/**
  * Rebuild a whole obfuscated stat table from fields, one {@link STAT_CHUNK_SIZE}
- * -byte chunk each (`Key:Value` line + zero filler), in the given order. The
- * inverse of {@link parseStatTable} at the field level - but note the original
- * files carry non-zero filler after each line, so this is a *functional* rebuild
- * (the engine ignores the filler), not necessarily byte-identical to the input.
- * For an in-place value change that preserves the rest of the file exactly, use
+ * -byte chunk each via {@link packStatSlot} (obfuscated `Key:Value` line, a literal
+ * `0x00` terminator, then zero filler), in the given order. The inverse of
+ * {@link parseStatTable} at the field level - but note the original files carry
+ * non-zero filler after each line, so this is a *functional* rebuild (the engine
+ * ignores the filler), not necessarily byte-identical to the input. For an
+ * in-place value change that preserves the rest of the file exactly, use
  * {@link setStatValue} instead.
  *
  * @throws RangeError if any `key:value` line does not fit in a chunk.
  */
 export function formatStatTable(fields: Iterable<ConfigEntry>): Uint8Array {
   const list = [...fields]
-  const plain = new Uint8Array(list.length * STAT_CHUNK_SIZE)
+  const out = new Uint8Array(list.length * STAT_CHUNK_SIZE)
   list.forEach((field, i) => {
-    const bytes = latin1Bytes(`${field.key}:${field.value}\n`)
-    if (bytes.length > STAT_CHUNK_SIZE) {
-      throw new RangeError(
-        `field "${field.key}:${field.value}" is ${bytes.length} bytes, exceeds the ${STAT_CHUNK_SIZE}-byte chunk`,
-      )
-    }
-    plain.set(bytes, i * STAT_CHUNK_SIZE)
+    out.set(packStatSlot(`${field.key}:${field.value}`), i * STAT_CHUNK_SIZE)
   })
-  return obfuscate(plain)
+  return out
 }
