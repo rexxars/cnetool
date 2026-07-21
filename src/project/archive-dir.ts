@@ -4,6 +4,7 @@ import {basename, extname, isAbsolute, join} from 'node:path'
 
 import {buildTextureArchive, extractEntries, pngToTga, tgaToPng} from '../api/index.ts'
 import type {ArchiveInputEntry} from '../api/index.ts'
+import {isEnoent} from './fsutil.ts'
 
 /**
  * The `$schema` reference written into each `entries.json`. The sidecar lives at
@@ -133,10 +134,6 @@ async function loadEntryFile(dir: string, file: string): Promise<Uint8Array> {
   }
   if (file.toLowerCase().endsWith('.png')) return pngToTga(bytes, {topDown: true})
   return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength)
-}
-
-function isEnoent(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT'
 }
 
 async function readSidecar(dir: string): Promise<EntrySidecarRecord[]> {

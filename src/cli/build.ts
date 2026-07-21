@@ -18,6 +18,7 @@ contains a cnetool.json.
 
 Options:
   --no-cache          Ignore the build cache; re-copy every file.
+  --watch             Reserved — rebuild on change. Not yet implemented.
   -h, --help          Show this help.
 `
 

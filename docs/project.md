@@ -93,7 +93,7 @@ cnetool build my-mod --no-cache
 | ------------------------ | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | `textures/<archive>/`    | `24bits/textures.dat`, `24bits/texsec.dat`, `menu/menupics.dat` | PNGs (+ raw `.bin`) repacked into the archive; `entries.json` restores names + order.      |
 | `objects/<archive>/`     | `objects.dat`, `objects2.dat`                                   | One mesh directory per project + `raw/` blobs, repacked; `textures.json` + `entries.json`. |
-| `stats/*.json`           | `data3.bin`, `data4.bin`, `mdata3.bin`, `mdata4.bin`            | Re-serialized to the obfuscated stat-table binary.                                         |
+| `stats/*.json`           | `data3.bin`, `data4.bin`, `mdata3.bin`, `mdata4.bin`            | Edited text fields overlaid onto the pristine `.cnetool/base/<file>`, re-obfuscated.       |
 | `settings/menuinfo.json` | `menuinfo.dat`                                                  | Patched over the pristine `.cnetool/base/menuinfo.dat` and re-deflated.                    |
 | `settings/servinfo.json` | `servinfo.dat`                                                  | Re-serialized to the four-uint32 binary.                                                   |
 | `config/keyconf.txt`     | `keyconf.dat`                                                   | Copied back as latin1 text, byte-exact.                                                    |
@@ -128,7 +128,7 @@ Every source JSON document (`cnetool.json`, the stat tables, the settings files,
 
 What round-trips faithfully, and what doesn't:
 
-- **Textures, config, stat tables, scripts and placements round-trip faithfully.** Texture archives repack losslessly; `keyconf.txt` and the stat tables re-encode exactly; scripts and object placements (currently passthrough under `raw/`) are byte-identical.
+- **Textures, config, stat tables, scripts and placements round-trip faithfully.** Texture archives repack losslessly; `keyconf.txt` re-encodes exactly. The stat tables (`data3.bin`/`data4.bin`/…) round-trip **byte-faithfully**: each carries binary damage/ballistics payload past the `Key:Value` text, so `build` overlays the edited text fields onto the pristine `.cnetool/base/<file>` captured at init (preserving that binary tail) rather than re-serializing from scratch — an unmodified table rebuilds byte-for-byte. Scripts and object placements (currently passthrough under `raw/`) are byte-identical.
 - **`objects.dat` is byte-identical for cetool-authored meshes, and geometrically exact for shipped models.** A clean cetool-authored mesh rebuilds byte-for-byte. A shipped model rebuilds larger (shipped multi-LOD projects share one vertex array; the rebuild gives each layer its own copy) but resolves to identical geometry, materials and collision hull, and loads equivalently. Details in [formats.md](./formats.md#project-directory-format-cnetool-initbuild).
 - **`menuinfo.dat` rebuilds to a loadable file that may not be byte-identical.** It is patched over the pristine base and re-deflated, so the compressed bytes can differ while the decoded contents match.
 - **No encoder yet (carried as passthrough):** `.anm` animations; the localization DATs (`dialogue.dat`, `mission.dat`, `endbrf.dat`); AI routes (`data2.bin`); and the `aimap*` navigation rasters. These are copied through unchanged, so they load exactly as shipped but aren't editable via cnetool yet.

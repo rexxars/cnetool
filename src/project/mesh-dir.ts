@@ -11,6 +11,7 @@ import {
   serializeMesh,
 } from '../api/index.ts'
 import type {Mesh, MeshFace, MeshFaceAttrs, MtlMaterial, RgbColor} from '../api/index.ts'
+import {isEnoent} from './fsutil.ts'
 
 /**
  * The `$schema` reference written into each `project.json`. A project directory
@@ -226,10 +227,6 @@ async function readFileOrNull(path: string): Promise<string | null> {
     if (isEnoent(error)) return null
     throw error
   }
-}
-
-function isEnoent(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT'
 }
 
 /**

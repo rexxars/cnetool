@@ -210,7 +210,10 @@ describe('runBuild', () => {
   test('prints usage on --help', async () => {
     const cap = capture()
     await runBuild(['--help'])
-    expect(cap.stdout()).toMatch(/Usage: cnetool build/)
+    const out = cap.stdout()
+    expect(out).toMatch(/Usage: cnetool build/)
+    expect(out).toMatch(/--no-cache/)
+    expect(out).toMatch(/--watch/)
     expect(process.exitCode).toBe(0)
   })
 

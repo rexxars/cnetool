@@ -5,6 +5,8 @@ import {mkdir, readFile, writeFile} from 'node:fs/promises'
 import {dirname} from 'node:path'
 import {pipeline} from 'node:stream/promises'
 
+import {isEnoent} from './fsutil.ts'
+
 export interface CacheEntry {
   mtimeMs: number
   size: number
@@ -24,10 +26,6 @@ export interface BuildCache {
 /** A fresh, empty cache. */
 export function emptyCache(): BuildCache {
   return {version: 1, entries: {}}
-}
-
-function isEnoent(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT'
 }
 
 function isCacheEntry(value: unknown): value is CacheEntry {
