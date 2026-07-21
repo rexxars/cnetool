@@ -5,7 +5,14 @@ import {basename, join} from 'node:path'
 import {parseMenuInfo, parseServerInfo, parseStatTable} from '../api/index.ts'
 import {extractArchiveDir} from './archive-dir.ts'
 import {copyThrough, walkFiles} from './fsutil.ts'
-import {CONFIG_FILES, STAT_TABLES, TEXTURE_ARCHIVES, isEngineGenerated} from './layout.ts'
+import {
+  CONFIG_FILES,
+  OBJECT_ARCHIVES,
+  STAT_TABLES,
+  TEXTURE_ARCHIVES,
+  isEngineGenerated,
+} from './layout.ts'
+import {extractObjectsArchive} from './objects-dir.ts'
 import {copySchemas, scaffoldProject} from './scaffold.ts'
 
 const latin1 = new TextDecoder('latin1')
@@ -37,7 +44,8 @@ function isAnimation(key: string): boolean {
  * tree. Scaffolds the project, then walks the install and routes every file to
  * the domain that owns it: texture archives are unpacked to editable PNGs, stat
  * tables and settings blobs are decoded to JSON, config texts are copied as
- * text, sounds/animations are copied through, and everything else lands in
+ * text, object archives are exploded into per-project OBJ directories,
+ * sounds/animations are copied through, and everything else lands in
  * `source/raw/` (engine-generated files are skipped entirely).
  *
  * @param gameDir - The game install directory to import.
@@ -107,7 +115,15 @@ export async function initProject(gameDir: string, projectDir: string): Promise<
     await writeFile(join(configRoot, spec.source), text, 'latin1')
   }
 
-  // 5/6. Sounds, animations, then everything else -> raw (skipping engine files).
+  // 5. Object archives -> source/objects/<archive>/ (projects + textures.json)
+  const objectsRoot = join(projectDir, 'source', 'objects')
+  for (const archive of OBJECT_ARCHIVES) {
+    const abs = claim(map, archive.toLowerCase())
+    if (abs === undefined) continue
+    await extractObjectsArchive(await readFile(abs), join(objectsRoot, archive.toLowerCase()))
+  }
+
+  // 6/7. Sounds, animations, then everything else -> raw (skipping engine files).
   const soundsRoot = join(projectDir, 'source', 'sounds')
   const animRoot = join(projectDir, 'source', 'animations')
   const rawRoot = join(projectDir, 'source', 'raw')

@@ -13,7 +13,14 @@ import {
 import {buildArchiveDirTexture} from './archive-dir.ts'
 import {isFresh, loadCache, putEntry, saveCache, type BuildCache} from './cache.ts'
 import {copyThrough, pathExists, walkFiles} from './fsutil.ts'
-import {CONFIG_FILES, STAT_TABLES, TEXTURE_ARCHIVES, isEngineGenerated} from './layout.ts'
+import {
+  CONFIG_FILES,
+  OBJECT_ARCHIVES,
+  STAT_TABLES,
+  TEXTURE_ARCHIVES,
+  isEngineGenerated,
+} from './layout.ts'
+import {buildObjectsArchive} from './objects-dir.ts'
 import {readManifest} from './scaffold.ts'
 import {menuInfoToPatch} from './settings.ts'
 
@@ -29,8 +36,8 @@ export interface BuildOptions {
  * Assemble a cetool project's `source/` tree into a loadable game install layout
  * under `output/`. The inverse of {@link initProject}: texture directories are
  * repacked into archives, stat/settings JSON is re-serialized to the binary
- * blobs, config texts are re-encoded, and sounds/animations/raw files are copied
- * through. Engine-generated files are swept from `output/` first (they are never
+ * blobs, config texts are re-encoded, object directories are repacked into
+ * `objects.dat`, and sounds/animations/raw files are copied through. Engine-generated files are swept from `output/` first (they are never
  * build products), and copy-through work is skipped for unchanged files via the
  * build cache.
  *
@@ -57,6 +64,7 @@ export async function buildProject(projectDir: string, options: BuildOptions = {
   await buildStats(sourceDir, outputDir)
   await buildSettings(projectDir, sourceDir, outputDir)
   await buildConfig(sourceDir, outputDir)
+  await buildObjects(sourceDir, outputDir)
   await buildCopyThrough(sourceDir, outputDir, cache)
 
   if (cache !== undefined) await saveCache(cachePath, cache)
@@ -96,6 +104,14 @@ async function buildSettings(
   if (await pathExists(servInfoPath)) {
     const info = readServerInfo(await readFile(servInfoPath, 'utf8'))
     await writeOutput(join(outputDir, 'servinfo.dat'), formatServerInfo(info))
+  }
+}
+
+async function buildObjects(sourceDir: string, outputDir: string): Promise<void> {
+  for (const archive of OBJECT_ARCHIVES) {
+    const dir = join(sourceDir, 'objects', archive.toLowerCase())
+    if (!(await pathExists(dir))) continue
+    await writeOutput(join(outputDir, archive.toLowerCase()), await buildObjectsArchive(dir))
   }
 }
 

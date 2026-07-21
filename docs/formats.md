@@ -1058,6 +1058,18 @@ Recovered from `PACKETOR`'s reader (`fopen(…, "rt")` then `fscanf`). Each vert
 
 cnetool can build `objects.dat` projects directly, bypassing the tool chain above: `serializeMesh(mesh, {detect})` writes a project blob (the inverse of `parseMesh` - it regenerates the edge table from face topology, with the 5th byte as a face-share count), and `objToMesh` imports Wavefront OBJ (the inverse of `meshToObj`), reading face colour and opacity from a companion `.mtl`'s `Kd`/`d` (`objToMesh(text, {mtl})`) and texture ids from `usemtl tex<n>` names. So the modern workflow is **model in any tool → `.obj` + `.mtl` → `objToMesh` → `serializeMesh` → `buildArchive` → `objects.dat`**. Geometry, UVs, texIds, and per-face colour/opacity round-trip through `parseMesh`/`parseDetectMesh`; the only non-exact field versus PACKETOR is the edge 5th byte (PACKETOR also accumulates it across its diagonal/merge passes), which the engine appears not to need since it recomputes normals at load (not yet verified with an in-game load test).
 
+### Project directory format (cnetool `init`/`build`)
+
+`cnetool init` explodes each `objects.dat` project into `source/objects/<archive>/<project>/`: `high.obj` (+ `medium.obj`/`low.obj` for genuine extra render LODs), a `detect.obj` collision hull when present, `model.mtl`, and a `project.json` sidecar. Faces are grouped into materials `m0`, `m1`, … - one per distinct `(texId, flags, color, alpha)` tuple - so every field OBJ can't natively carry survives; `project.json` maps each material to its texture filename (resolved via the archive's texId table, kept in `textures.json`) and its flags/color/alpha. `cnetool build` (via `buildMeshDir`/`buildObjectsArchive`) reverses this.
+
+Round-trip fidelity is **byte-exact for cetool-authored (clean) meshes** but only **geometrically exact for shipped meshes** (verified: all 430 non-empty projects in 1.41's `objects.dat` reparse to identical resolved geometry + materials + detect hulls; the rebuilt archive is ~2× larger). Three things make shipped blobs non-byte-identical, none of which change what the engine loads:
+
+- **Shared vertex array.** Shipped multi-LOD projects point every render layer at one shared vertex array (e.g. `safe`'s three layers reference `[0,15]`/`[9,18]`/`[9,18]` of 19 shared verts). `serializeMesh` instead concatenates each layer's own vertices, so on rebuild the shared verts are duplicated per layer (the size growth). Each layer resolves to the same positions, so geometry is unchanged.
+- **Edge-table 5th byte** (face-share count) differs from PACKETOR's, as already noted above.
+- **`parseMesh`'s `dropRedundantFaces`** strips zero-area/subset slivers on read, so they aren't re-emitted.
+
+Empty/non-mesh entries (43 in 1.41) can't be exploded to OBJ; `init` stores them verbatim as `raw/<slug>.bin` and `entries.json` records `kind: "raw"` so they round-trip byte-for-byte. The archive container itself round-trips via `buildArchive` modulo the documented don't-care name/texture-table NUL padding.
+
 ## Media assets
 
 These are standard third-party formats - documented here for reference; cnetool doesn't re-implement codecs for them (use the off-the-shelf tools noted below).

@@ -4,14 +4,16 @@ import {basename, join, relative, sep} from 'node:path'
 import {afterEach, describe, expect, test} from 'vitest'
 
 import {
+  buildArchive,
   buildTextureArchive,
   encodeMenuInfo,
   encodePng,
   formatServerInfo,
   formatStatTable,
   pngToTga,
+  serializeMesh,
 } from '../src/index.ts'
-import type {RawImage} from '../src/index.ts'
+import type {Mesh, RawImage} from '../src/index.ts'
 import {buildProject} from '../src/project/build.ts'
 import {initProject} from '../src/project/init.ts'
 import {isEngineGenerated} from '../src/project/layout.ts'
@@ -49,6 +51,45 @@ function makeImage(size: number, seed: number): RawImage {
 // A game-faithful archive texture blob (rows top-down behind a bottom-origin descriptor).
 function tgaFor(image: RawImage): Uint8Array {
   return pngToTga(encodePng(image), {topDown: true})
+}
+
+// A small textured quad mesh referencing texId 0 (the objects.dat texture table).
+function quadMesh(): Mesh {
+  return {
+    vertices: [
+      {x: 0, y: 0, z: 0},
+      {x: 2, y: 0, z: 0},
+      {x: 2, y: 2, z: 0},
+      {x: 0, y: 2, z: 0},
+    ],
+    faces: [
+      {
+        vertices: [0, 1, 2, 3],
+        color: {r: 128, g: 128, b: 128},
+        alpha: 255,
+        flags: 4,
+        texId: 0,
+        uv: [
+          [0, 0],
+          [1, 0],
+          [1, 1],
+          [0, 1],
+        ],
+      },
+    ],
+  }
+}
+
+// A small objects.dat: one mesh project (referencing one texture) + a non-mesh
+// raw stub, with the texId → filename table so the mesh's face resolves.
+function objectsDat(): Uint8Array {
+  return buildArchive(
+    [
+      {name: 'Ramp', data: serializeMesh(quadMesh())},
+      {name: 'Stub', data: new Uint8Array([0, 0, 0, 0, 1, 2, 3])}, // vc=0 → not a mesh
+    ],
+    {textures: ['ROAD.TGA']},
+  )
 }
 
 function writeAscii(data: Uint8Array, offset: number, value: string): void {
@@ -121,6 +162,8 @@ async function makeInstall(dir: string): Promise<void> {
       {key: 'Damage', value: '25'},
     ]),
   )
+
+  await write('objects.dat', objectsDat())
 
   await write('menuinfo.dat', menuInfoBytes())
   await write(
@@ -200,6 +243,23 @@ describe('project init/build round-trip', () => {
     const serv = JSON.parse(await readFile(src('settings/servinfo.json'), 'utf8'))
     expect(serv.$schema).toContain('servinfo.schema.json')
     expect(await exists(join(project, '.cnetool', 'base', 'menuinfo.dat'))).toBe(true)
+
+    // Object archive: exploded into a per-project dir + a raw stub + sidecars.
+    const objBase = 'objects/objects.dat'
+    expect(await exists(src(`${objBase}/ramp/high.obj`))).toBe(true)
+    expect(await exists(src(`${objBase}/ramp/project.json`))).toBe(true)
+    expect(await exists(src(`${objBase}/ramp/model.mtl`))).toBe(true)
+    expect(await exists(src(`${objBase}/raw/stub.bin`))).toBe(true)
+    const textures = JSON.parse(await readFile(src(`${objBase}/textures.json`), 'utf8'))
+    expect(textures.textures).toEqual(['ROAD.TGA'])
+    const objEntries = JSON.parse(await readFile(src(`${objBase}/entries.json`), 'utf8'))
+    expect(objEntries.entries.map((e: {name: string; kind: string}) => [e.name, e.kind])).toEqual([
+      ['Ramp', 'mesh'],
+      ['Stub', 'raw'],
+    ])
+    const rampProject = JSON.parse(await readFile(src(`${objBase}/ramp/project.json`), 'utf8'))
+    expect(rampProject.name).toBe('Ramp')
+    expect(rampProject.materials.m0.texture).toBe('ROAD.TGA')
 
     expect(await exists(src('config/keyconf.txt'))).toBe(true)
     expect(await exists(src('sounds/fx/shot.wav'))).toBe(true)
