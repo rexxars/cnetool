@@ -37,7 +37,7 @@ export async function findProjectRoot(startDir: string): Promise<string> {
     dir = parent
   }
   throw new Error(
-    `No cnetool.json found in ${resolve(startDir)} or any parent directory - run "cnetool init <game-dir>" first.`,
+    `No cnetool.json found in ${resolve(startDir)} or any parent directory — run "cnetool init <game-dir>" first.`,
   )
 }
 

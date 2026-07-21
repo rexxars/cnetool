@@ -143,6 +143,20 @@ describe('runInit', () => {
     expect(cap.stderr()).toMatch(/not empty|not a cnetool project/i)
     expect(await exists(join(project, 'cnetool.json'))).toBe(false)
   })
+
+  test('surfaces "already a cnetool project" when re-initializing a scaffold', async () => {
+    const install = await tmp()
+    const project = await tmp()
+    await makeInstall(install)
+
+    capture()
+    await runInit([install, project])
+    expect(process.exitCode).toBe(0)
+
+    // Second init falls through the non-empty guard (cnetool.json present) into
+    // scaffoldProject, which refuses to overwrite an existing project.
+    await expect(runInit([install, project])).rejects.toThrow(/already a cnetool project/)
+  })
 })
 
 describe('runBuild', () => {
@@ -160,6 +174,30 @@ describe('runBuild', () => {
     expect(process.exitCode).toBe(0)
     expect(await exists(join(project, 'output', 'data3.bin'))).toBe(true)
     expect(await exists(join(project, 'output', 'levels.nfo'))).toBe(true)
+  })
+
+  test('--no-cache bypasses the cache and does a fresh full rebuild', async () => {
+    const install = await tmp()
+    const project = await tmp()
+    await makeInstall(install)
+
+    capture()
+    await runInit([install, project])
+    // First build populates the copy-through cache (.cnetool/cache.json).
+    await runBuild([project])
+    expect(await exists(join(project, '.cnetool', 'cache.json'))).toBe(true)
+
+    // Remove a build product the cache would otherwise let a normal rebuild
+    // skip; --no-cache must regenerate it regardless of cache freshness.
+    const raw = join(project, 'output', 'levels.nfo')
+    await rm(raw)
+    expect(await exists(raw)).toBe(false)
+
+    await runBuild([project, '--no-cache'])
+
+    expect(process.exitCode).toBe(0)
+    expect(await exists(raw)).toBe(true)
+    expect(await exists(join(project, 'output', 'data3.bin'))).toBe(true)
   })
 
   test('rejects --watch as not implemented', async () => {
