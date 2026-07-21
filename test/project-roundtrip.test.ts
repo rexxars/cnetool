@@ -9,14 +9,12 @@ import {
   encodeMenuInfo,
   encodePng,
   formatServerInfo,
-  formatStatTable,
-  obfuscate,
   pngToTga,
   serializeMesh,
-  setStatField,
-  STAT_CHUNK_SIZE,
+  serializeUnitTable,
+  serializeWeaponTable,
 } from '../src/index.ts'
-import type {Mesh, RawImage} from '../src/index.ts'
+import type {Mesh, RawImage, Unit, WeaponTable} from '../src/index.ts'
 import {buildProject} from '../src/project/build.ts'
 import {initProject} from '../src/project/init.ts'
 import {isIgnoredFile} from '../src/project/layout.ts'
@@ -151,23 +149,11 @@ async function makeInstall(dir: string): Promise<void> {
     ]),
   )
 
-  await write(
-    'data3.bin',
-    formatStatTable([
-      {key: 'Name', value: 'Soldier'},
-      {key: 'Health', value: '100'},
-    ]),
-  )
-  // Real weapon/unit tables carry BINARY payload (damage/ballistics) in each
-  // 127-byte chunk past the `Key:Value` line. Give data4.bin such tails so the
-  // build's base-overlay preservation is actually exercised.
-  await write(
-    'data4.bin',
-    statTableWithBinaryTail([
-      {key: 'Name', value: 'Rifle'},
-      {key: 'Damage', value: '25'},
-    ]),
-  )
+  // Stat tables in CANONICAL serialized form, so init (decode) -> build
+  // (re-serialize) reproduces them byte-identically. One unit has armor, one
+  // does not; the weapon table carries all three ammoDamage rows and two weapons.
+  await write('data3.bin', serializeUnitTable(canonicalUnits))
+  await write('data4.bin', serializeWeaponTable(canonicalWeapons))
 
   await write('objects.dat', objectsDat())
 
@@ -195,18 +181,41 @@ async function makeInstall(dir: string): Promise<void> {
   await write('level128/.DS_Store', new Uint8Array([0, 0, 0, 2]))
 }
 
-// A stat table whose chunks carry non-text binary bytes AFTER the `Key:Value`
-// line — mirrors real data3/data4.bin, which store damage/ballistics tables in
-// the chunk tail. Built by filling every chunk with a non-zero pattern, then
-// overlaying the field lines with setStatField (leaving the tails intact).
-function statTableWithBinaryTail(fields: Array<{key: string; value: string}>): Uint8Array {
-  const plain = new Uint8Array(fields.length * STAT_CHUNK_SIZE)
-  for (let i = 0; i < plain.length; i++) plain[i] = (i * 7 + 3) & 0xff
-  let data = obfuscate(plain)
-  fields.forEach((field, i) => {
-    data = setStatField(data, i, field.key, field.value)
-  })
-  return data
+// Canonical typed stat fixtures: serialized to data3/data4.bin, these round-trip
+// byte-identically through init (decode -> JSON) and build (JSON -> re-serialize).
+const canonicalUnits: Unit[] = [
+  {name: 'Soldier', armor: 'light', health: 100, fireDelay: 0.5},
+  {name: 'Crate', health: 40, fireDelay: 0},
+]
+
+const canonicalWeapons: WeaponTable = {
+  ammoDamage: {
+    gas: {heavy: 0, light: 50, none: 100},
+    bullet: {heavy: 11, light: 21, none: 100},
+    shell: {heavy: 100, light: 100, none: 100},
+  },
+  weapons: [
+    {
+      index: 0,
+      name: 'Rifle',
+      damage: 25,
+      ammoType: 'bullet',
+      ammoSpeed: 800,
+      fireDelay: 0.2,
+      weaponLength: 1.5,
+      sound: 'sounds/fx/shot.wav',
+    },
+    {
+      index: 1,
+      name: 'Cannon',
+      damage: 120,
+      ammoType: 'shell',
+      ammoSpeed: 400,
+      fireDelay: 1.5,
+      weaponLength: 3,
+      sound: 'sounds/fx/boom.wav',
+    },
+  ],
 }
 
 function latin1Bytes(value: string): Uint8Array {
@@ -257,17 +266,27 @@ describe('project init/build round-trip', () => {
     expect(await exists(src('textures/textures.dat/btex.png'))).toBe(true)
     expect(await exists(src('textures/textures.dat/entries.json'))).toBe(true)
 
-    for (const name of ['units.json', 'weapons.json']) {
-      const parsed = JSON.parse(await readFile(src(`stats/${name}`), 'utf8'))
-      expect(parsed.$schema).toContain('stats.schema.json')
-      expect(Array.isArray(parsed.fields) && parsed.fields.length > 0).toBe(true)
-    }
+    const units = JSON.parse(await readFile(src('stats/units.json'), 'utf8'))
+    expect(units.$schema).toContain('units.schema.json')
+    expect(units.fields).toBeUndefined()
+    expect(units.units).toEqual(canonicalUnits)
+
+    const weapons = JSON.parse(await readFile(src('stats/weapons.json'), 'utf8'))
+    expect(weapons.$schema).toContain('weapons.schema.json')
+    expect(weapons.fields).toBeUndefined()
+    expect(weapons.ammoDamage).toEqual(canonicalWeapons.ammoDamage)
+    expect(weapons.weapons).toEqual(canonicalWeapons.weapons)
 
     const menu = JSON.parse(await readFile(src('settings/menuinfo.json'), 'utf8'))
     expect(menu.$schema).toContain('menuinfo.schema.json')
     const serv = JSON.parse(await readFile(src('settings/servinfo.json'), 'utf8'))
     expect(serv.$schema).toContain('servinfo.schema.json')
+
+    // Only menuinfo is captured as a pristine base (it is patched over on build);
+    // stat tables are re-serialized from their typed JSON, so no base is kept.
     expect(await exists(join(project, '.cnetool', 'base', 'menuinfo.dat'))).toBe(true)
+    expect(await exists(join(project, '.cnetool', 'base', 'data3.bin'))).toBe(false)
+    expect(await exists(join(project, '.cnetool', 'base', 'data4.bin'))).toBe(false)
 
     // Object archive: exploded into a per-project dir + a raw stub + sidecars.
     const objBase = 'objects/objects.dat'
@@ -365,23 +384,19 @@ describe('project init/build round-trip', () => {
     expect(await exists(stale)).toBe(false)
   })
 
-  test('an unmodified stat table with a binary tail round-trips byte-identically', async () => {
+  test('a stat table round-trips byte-identically from its canonical form', async () => {
     const install = await tmp()
     const project = await tmp()
     await makeInstall(install)
 
     await initProject(install, project)
-    // The base was captured at init; build overlays the JSON fields onto it.
-    expect(await exists(join(project, '.cnetool', 'base', 'data4.bin'))).toBe(true)
-
     await buildProject(project)
 
-    const original = await readFile(join(install, 'data4.bin'))
-    const rebuilt = await readFile(join(project, 'output', 'data4.bin'))
-    expect(Buffer.compare(original, rebuilt)).toBe(0)
-    // Sanity: the fixture genuinely carries non-zero bytes past the Key:Value text.
-    const tail = original.subarray(STAT_CHUNK_SIZE - 16, STAT_CHUNK_SIZE)
-    expect(tail.some((byte) => byte !== 0)).toBe(true)
+    for (const file of ['data3.bin', 'data4.bin']) {
+      const original = await readFile(join(install, file))
+      const rebuilt = await readFile(join(project, 'output', file))
+      expect(Buffer.compare(original, rebuilt), `bytes differ for ${file}`).toBe(0)
+    }
   })
 
   test('.cnetool/base/ is committed (not matched by the generated .gitignore)', async () => {

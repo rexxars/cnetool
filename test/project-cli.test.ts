@@ -3,7 +3,7 @@ import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {afterEach, beforeEach, describe, expect, test, vi} from 'vitest'
 
-import {formatStatTable} from '../src/index.ts'
+import {serializeUnitTable} from '../src/index.ts'
 import {findProjectRoot, runBuild} from '../src/cli/build.ts'
 import {runInit} from '../src/cli/init.ts'
 
@@ -36,10 +36,7 @@ function latin1Bytes(value: string): Uint8Array {
 async function makeInstall(dir: string): Promise<void> {
   await writeFile(
     join(dir, 'data3.bin'),
-    formatStatTable([
-      {key: 'Name', value: 'Soldier'},
-      {key: 'Health', value: '100'},
-    ]),
+    serializeUnitTable([{name: 'Soldier', armor: 'light', health: 100, fireDelay: 0.5}]),
   )
   await writeFile(
     join(dir, 'levels.nfo'),

@@ -51,10 +51,10 @@ describe('isIgnoredFile', () => {
 describe('domain tables', () => {
   test('stat tables map binaries to friendly names', () => {
     expect(STAT_TABLES).toEqual([
-      {file: 'data3.bin', source: 'units.json'},
-      {file: 'data4.bin', source: 'weapons.json'},
-      {file: 'mdata3.bin', source: 'units-mp.json'},
-      {file: 'mdata4.bin', source: 'weapons-mp.json'},
+      {file: 'data3.bin', source: 'units.json', kind: 'units'},
+      {file: 'data4.bin', source: 'weapons.json', kind: 'weapons'},
+      {file: 'mdata3.bin', source: 'units-mp.json', kind: 'units'},
+      {file: 'mdata4.bin', source: 'weapons-mp.json', kind: 'weapons'},
     ])
   })
   test('texture archives carry install path and source dir', () => {

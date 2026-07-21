@@ -170,16 +170,18 @@ describe('scaffoldProject', () => {
 })
 
 describe('copySchemas', () => {
-  test('copies all five schema files, each valid JSON', async () => {
+  test('copies every schema file, each valid JSON', async () => {
     const dir = await tmp()
     await copySchemas(dir)
 
     const names = [
       'cnetool.schema.json',
-      'stats.schema.json',
-      'menuinfo.schema.json',
-      'servinfo.schema.json',
       'entries.schema.json',
+      'menuinfo.schema.json',
+      'project.schema.json',
+      'servinfo.schema.json',
+      'units.schema.json',
+      'weapons.schema.json',
     ]
     for (const name of names) {
       const path = join(dir, '.cnetool/schemas', name)
