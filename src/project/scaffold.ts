@@ -88,7 +88,7 @@ export async function createSkeleton(projectDir: string): Promise<void> {
   }
   await mkdir(join(projectDir, 'output'), {recursive: true})
   await mkdir(join(projectDir, '.cnetool', 'schemas'), {recursive: true})
-  await writeFile(join(projectDir, '.gitignore'), 'output/\n.cnetool/cache.json\n')
+  await writeFile(join(projectDir, '.gitignore'), 'output/\n.cnetool/cache.json\n.DS_Store\n')
 }
 
 /** Write the `cnetool.json` manifest (`$schema`, `game`, optional `deploy`). */

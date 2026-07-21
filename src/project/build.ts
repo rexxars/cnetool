@@ -18,7 +18,7 @@ import {
   OBJECT_ARCHIVES,
   STAT_TABLES,
   TEXTURE_ARCHIVES,
-  isEngineGenerated,
+  isIgnoredFile,
 } from './layout.ts'
 import {buildObjectsArchive} from './objects-dir.ts'
 import {readManifest} from './scaffold.ts'
@@ -55,9 +55,9 @@ export async function buildProject(projectDir: string, options: BuildOptions = {
   const sourceDir = join(projectDir, 'source')
   const outputDir = join(projectDir, 'output')
 
-  // Sweep engine-generated files out of output/ — never build products.
+  // Sweep engine-generated files and OS cruft out of output/ — never build products.
   for (const rel of await walkFiles(outputDir)) {
-    if (isEngineGenerated(basename(rel))) await rm(join(outputDir, rel))
+    if (isIgnoredFile(basename(rel))) await rm(join(outputDir, rel))
   }
 
   // Every output relpath this run produces; used below to prune orphans.

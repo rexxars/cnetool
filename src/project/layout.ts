@@ -51,3 +51,12 @@ export function isEngineGenerated(name: string): boolean {
     lower.endsWith('cache.bin')
   )
 }
+
+/**
+ * Files excluded from the source tree and from a build entirely: engine-generated
+ * runtime files plus OS filesystem cruft (`.DS_Store`, which SMB shares expose as
+ * `.ds_store`). Skipped on init, swept from `output/` on build.
+ */
+export function isIgnoredFile(name: string): boolean {
+  return isEngineGenerated(name) || name.toLowerCase() === '.ds_store'
+}

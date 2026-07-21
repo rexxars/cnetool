@@ -10,7 +10,7 @@ import {
   OBJECT_ARCHIVES,
   STAT_TABLES,
   TEXTURE_ARCHIVES,
-  isEngineGenerated,
+  isIgnoredFile,
 } from './layout.ts'
 import {extractObjectsArchive} from './objects-dir.ts'
 import {copySchemas, createSkeleton, writeManifest} from './scaffold.ts'
@@ -140,7 +140,7 @@ export async function initProject(gameDir: string, projectDir: string): Promise<
   const rawRoot = join(projectDir, 'source', 'raw')
   for (const [key, abs] of map) {
     // Engine-generated files are never source, in any domain.
-    if (isEngineGenerated(basename(key))) continue
+    if (isIgnoredFile(basename(key))) continue
     if (key.startsWith('sounds/')) {
       await copyThrough(abs, join(soundsRoot, key.slice('sounds/'.length)))
     } else if (isAnimation(key)) {

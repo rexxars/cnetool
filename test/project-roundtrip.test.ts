@@ -19,7 +19,7 @@ import {
 import type {Mesh, RawImage} from '../src/index.ts'
 import {buildProject} from '../src/project/build.ts'
 import {initProject} from '../src/project/init.ts'
-import {isEngineGenerated} from '../src/project/layout.ts'
+import {isIgnoredFile} from '../src/project/layout.ts'
 
 const BLOCK_SIZE = 272
 const PAYLOAD_SIZE = 816
@@ -188,6 +188,11 @@ async function makeInstall(dir: string): Promise<void> {
   await write('level128/data1.bin', new Uint8Array([10, 20, 30, 40, 50]))
 
   await write('wcache.bin', new Uint8Array([0xde, 0xad, 0xbe, 0xef]))
+
+  // OS filesystem cruft (SMB shares expose it as `.ds_store`) — must never enter
+  // the source tree or a build, at any depth.
+  await write('.DS_Store', new Uint8Array([0, 0, 0, 1]))
+  await write('level128/.DS_Store', new Uint8Array([0, 0, 0, 2]))
 }
 
 // A stat table whose chunks carry non-text binary bytes AFTER the `Key:Value`
@@ -290,9 +295,10 @@ describe('project init/build round-trip', () => {
     expect(await exists(src('raw/levels.nfo'))).toBe(true)
     expect(await exists(src('raw/level128/data1.bin'))).toBe(true)
 
-    // No engine-generated file leaked into source/.
+    // No engine-generated file or OS cruft leaked into source/, at any depth.
     const sourceFiles = await listFiles(join(project, 'source'))
     expect(sourceFiles.some((f) => basename(f) === 'wcache.bin')).toBe(false)
+    expect(sourceFiles.some((f) => basename(f).toLowerCase() === '.ds_store')).toBe(false)
 
     expect(await exists(join(project, 'cnetool.json'))).toBe(true)
     expect(await exists(join(project, '.gitignore'))).toBe(true)
@@ -308,11 +314,12 @@ describe('project init/build round-trip', () => {
     await buildProject(project)
 
     const output = join(project, 'output')
-    const expected = (await listFiles(install)).filter((f) => !isEngineGenerated(basename(f)))
+    const expected = (await listFiles(install)).filter((f) => !isIgnoredFile(basename(f)))
     const actual = await listFiles(output)
     expect(actual).toEqual(expected)
 
     expect(actual.some((f) => basename(f) === 'wcache.bin')).toBe(false)
+    expect(actual.some((f) => basename(f).toLowerCase() === '.ds_store')).toBe(false)
 
     for (const rel of expected) {
       const a = await readFile(join(install, rel))
@@ -384,7 +391,7 @@ describe('project init/build round-trip', () => {
 
     await initProject(install, project)
     const gitignore = await readFile(join(project, '.gitignore'), 'utf8')
-    expect(gitignore).toBe('output/\n.cnetool/cache.json\n')
+    expect(gitignore).toBe('output/\n.cnetool/cache.json\n.DS_Store\n')
     expect(gitignore).not.toContain('base')
   })
 

@@ -1,5 +1,11 @@
 import {describe, expect, test} from 'vitest'
-import {isEngineGenerated, slugify, STAT_TABLES, TEXTURE_ARCHIVES} from '../src/project/layout.ts'
+import {
+  isEngineGenerated,
+  isIgnoredFile,
+  slugify,
+  STAT_TABLES,
+  TEXTURE_ARCHIVES,
+} from '../src/project/layout.ts'
 
 describe('slugify', () => {
   test('lowercases and hyphenates level names', () => {
@@ -25,6 +31,19 @@ describe('isEngineGenerated', () => {
   test('does not match build products', () => {
     for (const name of ['data1.bin', 'textures.dat', 'world.dat', 'cache.json']) {
       expect(isEngineGenerated(name)).toBe(false)
+    }
+  })
+})
+
+describe('isIgnoredFile', () => {
+  test('matches engine-generated files and .DS_Store cruft case-insensitively', () => {
+    for (const name of ['wcache.bin', 'diacache.dat', '.DS_Store', '.ds_store']) {
+      expect(isIgnoredFile(name)).toBe(true)
+    }
+  })
+  test('does not match .DS_Store as a substring or real assets', () => {
+    for (const name of ['data1.bin', 'world.dat', 'my.ds_store.dat', 'textures.dat']) {
+      expect(isIgnoredFile(name)).toBe(false)
     }
   })
 })

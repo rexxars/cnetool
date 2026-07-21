@@ -141,7 +141,7 @@ describe('scaffoldProject', () => {
     expect('deploy' in parsed).toBe(false)
 
     const gitignore = await readFile(join(dir, '.gitignore'), 'utf8')
-    expect(gitignore).toBe('output/\n.cnetool/cache.json\n')
+    expect(gitignore).toBe('output/\n.cnetool/cache.json\n.DS_Store\n')
   })
 
   test('writes deploy after game when provided', async () => {
