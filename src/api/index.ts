@@ -63,6 +63,7 @@ export {
 export type {
   MeshesToObjItem,
   MeshesToObjOptions,
+  MeshFaceAttrs,
   MeshLod,
   MeshToObjOptions,
   MtlMaterial,

@@ -535,12 +535,34 @@ function parseMtl(text: string): Map<string, {color: RgbColor; alpha: number}> {
   return map
 }
 
+/**
+ * Full face attributes a {@link ObjToMeshOptions.material} callback may return to
+ * rebuild a face faithfully - a texId plus optional overrides for the fields OBJ
+ * can't express (`flags`, `color`, `alpha`). Omitted fields fall back to the same
+ * defaults as returning the bare texId number.
+ */
+export interface MeshFaceAttrs {
+  /** Texture id, or `null` when the face is untextured. */
+  texId: number | null
+  /** Render-flags byte override (default `0x04`, use-raw-colour). */
+  flags?: number
+  /** Face colour override (default: the `usemtl`'s `Kd`, or white). */
+  color?: RgbColor
+  /** Opacity override 0-255 (default: the `usemtl`'s `d`, or 255/opaque). */
+  alpha?: number
+}
+
 /** Options for {@link objToMesh}. */
 export interface ObjToMeshOptions {
   /** Up-axis the OBJ uses (default `'y'`, matching {@link meshToObj}); inverted back to −Y-up storage. */
   up?: ObjUp
-  /** Map a `usemtl` name to a texture id (default recognises `tex<n>`); `null` = untextured. */
-  material?: (name: string) => number | null
+  /**
+   * Map a `usemtl` name to either a texture id (default recognises `tex<n>`; `null` =
+   * untextured), or a full {@link MeshFaceAttrs} to also override the face's
+   * `flags`/`color`/`alpha` - fields OBJ can't carry. Returning a bare number/`null`
+   * behaves exactly as the texId-only form.
+   */
+  material?: (name: string) => number | null | MeshFaceAttrs
   /** Companion `.mtl` contents - when given, faces take their colour/opacity from each `usemtl`'s `Kd`/`d`. */
   mtl?: string
 }
@@ -571,6 +593,7 @@ export function objToMesh(text: string, options: ObjToMeshOptions = {}): Mesh {
   let texId: number | null = null
   let color: RgbColor = {r: 255, g: 255, b: 255}
   let alpha = 255
+  let flags = 0x04 // use raw colour (so an untextured face shows its Kd colour as-is)
 
   for (const rawLine of text.split('\n')) {
     const line = rawLine.trim()
@@ -581,10 +604,22 @@ export function objToMesh(text: string, options: ObjToMeshOptions = {}): Mesh {
     else if (tag === 'vt') uvs.push([Number(parts[1]), Number(parts[2] ?? 0)])
     else if (tag === 'usemtl') {
       const name = parts.slice(1).join(' ')
-      texId = materialId(name)
+      const result = materialId(name)
       const mat = mtl?.get(name)
-      color = mat?.color ?? {r: 255, g: 255, b: 255} // Kd, or white when unknown
+      // The texId-only path defaults: raw-colour flags, Kd colour (white when unknown), opaque.
+      color = mat?.color ?? {r: 255, g: 255, b: 255}
       alpha = mat?.alpha ?? 255
+      flags = 0x04
+      if (result === null || typeof result === 'number') {
+        texId = result
+      } else {
+        // A full MeshFaceAttrs: texId plus any of flags/color/alpha, each falling back
+        // to the same default as the texId-only path when absent.
+        texId = result.texId
+        if (result.flags !== undefined) flags = result.flags
+        if (result.color !== undefined) color = result.color
+        if (result.alpha !== undefined) alpha = result.alpha
+      }
     } else if (tag === 'f') {
       const vIdx: number[] = []
       const faceUv: Array<[number, number]> = []
@@ -600,7 +635,7 @@ export function objToMesh(text: string, options: ObjToMeshOptions = {}): Mesh {
         vertices: vIdx,
         color: {...color},
         alpha,
-        flags: 0x04, // use raw colour (so an untextured face shows its Kd colour as-is)
+        flags,
         texId: textured ? texId : null,
         uv: textured ? faceUv : null,
       })

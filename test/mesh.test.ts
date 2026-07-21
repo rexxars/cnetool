@@ -429,6 +429,60 @@ describe('objToMesh (OBJ importer)', () => {
     expect(rt.vertices).toHaveLength(4)
     expect(rt.faces[0]!.vertices).toEqual([0, 1, 2, 3])
   })
+
+  test('material callback returning a number sets texId (backward compat)', () => {
+    const obj = 'usemtl m0\nv 0 0 0\nv 1 0 0\nv 0 1 0\nvt 0 0\nvt 1 0\nvt 0 1\nf 1/1 2/2 3/3\n'
+    const face = objToMesh(obj, {
+      up: 'raw',
+      material: (name) => (name === 'm0' ? 9 : null),
+    }).faces[0]!
+    expect(face.texId).toBe(9)
+    expect(face.flags).toBe(0x04) // unchanged default
+    expect(face.color).toEqual({r: 255, g: 255, b: 255})
+    expect(face.alpha).toBe(255)
+  })
+
+  test('material callback may return full face attributes (flags/color/alpha)', () => {
+    const mesh: Mesh = {
+      vertices: [
+        {x: 0, y: 0, z: 0},
+        {x: 1, y: 0, z: 0},
+        {x: 0, y: 1, z: 0},
+      ],
+      faces: [
+        {
+          vertices: [0, 1, 2],
+          color: {r: 12, g: 34, b: 56},
+          alpha: 128,
+          flags: 2,
+          texId: 3,
+          uv: [
+            [0, 0],
+            [1, 0],
+            [0.5, 1],
+          ],
+        },
+      ],
+    }
+    const obj = meshToObj(mesh, {up: 'raw', material: () => 'm0'})
+    const back = objToMesh(obj, {
+      up: 'raw',
+      material: (name) =>
+        name === 'm0' ? {texId: 3, flags: 2, color: {r: 12, g: 34, b: 56}, alpha: 128} : null,
+    })
+    const face = back.faces[0]!
+    expect(face.texId).toBe(3)
+    expect(face.flags).toBe(2)
+    expect(face.color).toEqual({r: 12, g: 34, b: 56})
+    expect(face.alpha).toBe(128)
+  })
+
+  test('MeshFaceAttrs with only texId matches the numeric path defaults', () => {
+    const obj = 'usemtl m0\nv 0 0 0\nv 1 0 0\nv 0 1 0\nvt 0 0\nvt 1 0\nvt 0 1\nf 1/1 2/2 3/3\n'
+    const asNumber = objToMesh(obj, {up: 'raw', material: () => 5}).faces[0]!
+    const asAttrs = objToMesh(obj, {up: 'raw', material: () => ({texId: 5})}).faces[0]!
+    expect(asAttrs).toEqual(asNumber)
+  })
 })
 
 describe('parseMesh lod selection', () => {
