@@ -132,6 +132,7 @@ async function makeInstall(dir: string): Promise<void> {
 
   await write('sounds/fx/shot.wav', new Uint8Array([1, 2, 3, 4, 5]))
   await write('anm/mc.anm', new Uint8Array([9, 8, 7, 6]))
+  await write('anm/sub/deep.anm', new Uint8Array([11, 22, 33]))
 
   await write('ce.exe', new Uint8Array([0x4d, 0x5a, 0x90, 0x00]))
   await write('levels.nfo', latin1Bytes('Name:No mans land\r\nVal:128\r\n'))
@@ -203,6 +204,8 @@ describe('project init/build round-trip', () => {
     expect(await exists(src('config/keyconf.txt'))).toBe(true)
     expect(await exists(src('sounds/fx/shot.wav'))).toBe(true)
     expect(await exists(src('animations/mc.anm'))).toBe(true)
+    // Nested anm/ subdirs are preserved, not flattened to the basename.
+    expect(await exists(src('animations/sub/deep.anm'))).toBe(true)
     expect(await exists(src('raw/ce.exe'))).toBe(true)
     expect(await exists(src('raw/levels.nfo'))).toBe(true)
     expect(await exists(src('raw/level128/data1.bin'))).toBe(true)
@@ -235,6 +238,28 @@ describe('project init/build round-trip', () => {
       const a = await readFile(join(install, rel))
       const b = await readFile(join(output, rel))
       expect(Buffer.compare(a, b), `bytes differ for ${rel}`).toBe(0)
+    }
+  })
+
+  test('building twice is idempotent (cache-skip path produces identical output)', async () => {
+    const install = await tmp()
+    const project = await tmp()
+    await makeInstall(install)
+
+    await initProject(install, project)
+    await buildProject(project)
+
+    const output = join(project, 'output')
+    const files = await listFiles(output)
+    const first = await Promise.all(files.map((rel) => readFile(join(output, rel))))
+
+    // Second build: copy-through domains hit the fresh cache and are skipped.
+    await buildProject(project)
+
+    const filesAgain = await listFiles(output)
+    expect(filesAgain).toEqual(files)
+    for (let i = 0; i < files.length; i++) {
+      expect(Buffer.compare(first[i]!, await readFile(join(output, files[i]!))), files[i]).toBe(0)
     }
   })
 

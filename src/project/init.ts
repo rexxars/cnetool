@@ -27,9 +27,9 @@ async function writeJson(path: string, document: Record<string, unknown>): Promi
   await writeFile(path, `${JSON.stringify(document, null, 2)}\n`)
 }
 
-/** Whether a lowercase relpath names a `.anm` file living under an `anm/` directory. */
+/** Whether a lowercase relpath is a `.anm` file directly under the top-level `anm/` directory. */
 function isAnimation(key: string): boolean {
-  return key.endsWith('.anm') && (key.startsWith('anm/') || key.includes('/anm/'))
+  return key.startsWith('anm/') && key.endsWith('.anm')
 }
 
 /**
@@ -112,11 +112,14 @@ export async function initProject(gameDir: string, projectDir: string): Promise<
   const animRoot = join(projectDir, 'source', 'animations')
   const rawRoot = join(projectDir, 'source', 'raw')
   for (const [key, abs] of map) {
+    // Engine-generated files are never source, in any domain.
+    if (isEngineGenerated(basename(key))) continue
     if (key.startsWith('sounds/')) {
       await copyThrough(abs, join(soundsRoot, key.slice('sounds/'.length)))
     } else if (isAnimation(key)) {
-      await copyThrough(abs, join(animRoot, basename(key)))
-    } else if (!isEngineGenerated(basename(key))) {
+      // Preserve any subdirs under anm/ (mirrors how sounds are handled).
+      await copyThrough(abs, join(animRoot, key.slice('anm/'.length)))
+    } else {
       await copyThrough(abs, join(rawRoot, key))
     }
   }

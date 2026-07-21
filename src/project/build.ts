@@ -6,12 +6,12 @@ import {
   formatMenuInfo,
   formatServerInfo,
   formatStatTable,
+  type ConfigEntry,
   type MenuInfo,
   type ServerInfo,
-  type StatField,
 } from '../api/index.ts'
 import {buildArchiveDirTexture} from './archive-dir.ts'
-import {hashFile, isFresh, loadCache, putEntry, saveCache, type BuildCache} from './cache.ts'
+import {isFresh, loadCache, putEntry, saveCache, type BuildCache} from './cache.ts'
 import {copyThrough, pathExists, walkFiles} from './fsutil.ts'
 import {CONFIG_FILES, STAT_TABLES, TEXTURE_ARCHIVES, isEngineGenerated} from './layout.ts'
 import {readManifest} from './scaffold.ts'
@@ -132,8 +132,9 @@ async function buildCopyThrough(
 
 /**
  * Copy `src` to `dest`, skipping the copy when the cache marks the source fresh
- * and the destination already exists. On a copy, records the source's hash.
- * With no cache (`cache === undefined`) it always copies.
+ * (`mtimeMs`+`size`) and the destination already exists. On a copy, records the
+ * source's stat only — no hashing, so large files are not re-read to hash and
+ * discard. With no cache (`cache === undefined`) it always copies.
  */
 async function copyCached(
   src: string,
@@ -145,7 +146,7 @@ async function copyCached(
     const {mtimeMs, size} = await stat(src)
     if (isFresh(cache, key, {mtimeMs, size}) && (await pathExists(dest))) return
     await copyThrough(src, dest)
-    putEntry(cache, key, {mtimeMs, size}, await hashFile(src))
+    putEntry(cache, key, {mtimeMs, size})
     return
   }
   await copyThrough(src, dest)
@@ -185,7 +186,9 @@ function bool(record: Record<string, unknown>, key: string, label: string): bool
   return value
 }
 
-function readStatFields(raw: string, source: string): StatField[] {
+// `formatStatTable` consumes only {key, value}; the `chunk` index (written by
+// init as metadata) is ignored on rebuild, so it is optional in hand-authored JSON.
+function readStatFields(raw: string, source: string): ConfigEntry[] {
   const label = `stats source ${source}`
   const record = asRecord(parseJson(raw, label), label)
   const {fields} = record
@@ -196,7 +199,6 @@ function readStatFields(raw: string, source: string): StatField[] {
     return {
       key: str(field, 'key', fieldLabel),
       value: str(field, 'value', fieldLabel),
-      chunk: num(field, 'chunk', fieldLabel),
     }
   })
 }

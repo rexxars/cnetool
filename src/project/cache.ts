@@ -8,7 +8,12 @@ import {pipeline} from 'node:stream/promises'
 export interface CacheEntry {
   mtimeMs: number
   size: number
-  hash: string
+  /**
+   * Optional sha256 of the source, as lowercase hex. Freshness only compares
+   * `mtimeMs`+`size`; the hash is content-identity metadata for consumers that
+   * need it (e.g. deploy), not written by the copy-through build path.
+   */
+  hash?: string
 }
 
 export interface BuildCache {
@@ -33,8 +38,7 @@ function isCacheEntry(value: unknown): value is CacheEntry {
     typeof value.mtimeMs === 'number' &&
     'size' in value &&
     typeof value.size === 'number' &&
-    'hash' in value &&
-    typeof value.hash === 'string'
+    (!('hash' in value) || typeof value.hash === 'string')
   )
 }
 
@@ -105,12 +109,18 @@ export function isFresh(
   return entry !== undefined && entry.mtimeMs === stat.mtimeMs && entry.size === stat.size
 }
 
-/** Record (or overwrite) an entry for `key`, mutating the cache in place. */
+/**
+ * Record (or overwrite) an entry for `key`, mutating the cache in place. The
+ * `hash` is optional: the copy-through build path omits it (freshness needs only
+ * `mtimeMs`+`size`); pass it when content identity is wanted.
+ */
 export function putEntry(
   cache: BuildCache,
   key: string,
   stat: {mtimeMs: number; size: number},
-  hash: string,
+  hash?: string,
 ): void {
-  cache.entries[key] = {mtimeMs: stat.mtimeMs, size: stat.size, hash}
+  const entry: CacheEntry = {mtimeMs: stat.mtimeMs, size: stat.size}
+  if (hash !== undefined) entry.hash = hash
+  cache.entries[key] = entry
 }

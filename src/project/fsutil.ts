@@ -2,7 +2,8 @@
 import {copyFile, mkdir, readdir, stat} from 'node:fs/promises'
 import {dirname, join, relative, sep} from 'node:path'
 
-function isEnoent(error: unknown): boolean {
+/** Whether an error is a Node "file not found" (`ENOENT`). */
+export function isEnoent(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT'
 }
 

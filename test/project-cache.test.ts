@@ -71,12 +71,19 @@ describe('loadCache', () => {
         version: 1,
         entries: {
           good: {mtimeMs: 1, size: 2, hash: 'ok'},
-          missingHash: {mtimeMs: 3, size: 4},
           stringSize: {mtimeMs: 5, size: '6', hash: 'bad'},
         },
       }),
     )
     expect(await loadCache(path)).toEqual({version: 1, entries: {}})
+  })
+
+  test('accepts an entry without a hash (hash is optional)', async () => {
+    const dir = await tmp()
+    const path = join(dir, 'cache.json')
+    const contents = {version: 1, entries: {'source/foo.txt': {mtimeMs: 1, size: 2}}}
+    await writeFile(path, JSON.stringify(contents))
+    expect(await loadCache(path)).toEqual(contents)
   })
 })
 
@@ -157,5 +164,11 @@ describe('putEntry', () => {
 
     putEntry(cache, 'k', {mtimeMs: 3, size: 4}, 'second')
     expect(cache.entries.k).toEqual({mtimeMs: 3, size: 4, hash: 'second'})
+  })
+
+  test('omits the hash entirely when none is given', () => {
+    const cache = emptyCache()
+    putEntry(cache, 'k', {mtimeMs: 1, size: 2})
+    expect(cache.entries.k).toEqual({mtimeMs: 1, size: 2})
   })
 })
