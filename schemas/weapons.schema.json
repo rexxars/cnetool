@@ -1,0 +1,134 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "cnetool weapon stat table (data4/mdata4)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Path to this JSON schema, enabling editor autocomplete."
+    },
+    "ammoDamage": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Damage-vs-armor matrix shared by all weapons. Each cell is the ammo type's percent effectiveness against that armor class (100 = full weapon damage; e.g. bullet 11 vs heavy = 11%).",
+      "properties": {
+        "bullet": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Percent effectiveness of bullet ammo against each armor class.",
+          "properties": {
+            "heavy": {
+              "type": "number",
+              "description": "Percent of weapon damage dealt to a heavy-armor target (100 = full)."
+            },
+            "light": {
+              "type": "number",
+              "description": "Percent of weapon damage dealt to a light-armor target (100 = full)."
+            },
+            "none": {
+              "type": "number",
+              "description": "Percent of weapon damage dealt to an unarmored (none) target (100 = full)."
+            }
+          },
+          "required": ["heavy", "light", "none"]
+        },
+        "gas": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Percent effectiveness of gas ammo against each armor class.",
+          "properties": {
+            "heavy": {
+              "type": "number",
+              "description": "Percent of weapon damage dealt to a heavy-armor target (100 = full)."
+            },
+            "light": {
+              "type": "number",
+              "description": "Percent of weapon damage dealt to a light-armor target (100 = full)."
+            },
+            "none": {
+              "type": "number",
+              "description": "Percent of weapon damage dealt to an unarmored (none) target (100 = full)."
+            }
+          },
+          "required": ["heavy", "light", "none"]
+        },
+        "shell": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Percent effectiveness of shell ammo against each armor class.",
+          "properties": {
+            "heavy": {
+              "type": "number",
+              "description": "Percent of weapon damage dealt to a heavy-armor target (100 = full)."
+            },
+            "light": {
+              "type": "number",
+              "description": "Percent of weapon damage dealt to a light-armor target (100 = full)."
+            },
+            "none": {
+              "type": "number",
+              "description": "Percent of weapon damage dealt to an unarmored (none) target (100 = full)."
+            }
+          },
+          "required": ["heavy", "light", "none"]
+        }
+      },
+      "required": ["bullet", "gas", "shell"]
+    },
+    "weapons": {
+      "type": "array",
+      "description": "All weapon stat records, in table order (position defines the weapon's index).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "index": {
+            "type": "integer",
+            "description": "The weapon's class number (0-based); scripts select weapons by this index. Read-only: it must equal the array position (the build validates this)."
+          },
+          "name": {
+            "type": "string",
+            "description": "Developer label (cosmetic; the engine selects by index, not name)."
+          },
+          "damage": {
+            "type": "number",
+            "description": "Base damage; final hit damage = round(damage x ammoDamage[ammoType][target armor] / 100)."
+          },
+          "ammoType": {
+            "type": "string",
+            "enum": ["bullet", "gas", "shell"],
+            "description": "Selects which ammoDamage row applies to this weapon."
+          },
+          "ammoSpeed": {
+            "type": "number",
+            "description": "Projectile muzzle speed (world units per physics tick), applied along the aim direction."
+          },
+          "fireDelay": {
+            "type": "number",
+            "description": "Seconds between shots."
+          },
+          "weaponLength": {
+            "type": "number",
+            "description": "Muzzle forward-offset: distance ahead of the shooter where the projectile/muzzle-flash spawns (barrel length), not range."
+          },
+          "sound": {
+            "type": "string",
+            "description": "Fire sound, a game-relative WAV path (e.g. \"Sounds\\FX\\WGunFi.WAV\")."
+          }
+        },
+        "required": [
+          "index",
+          "name",
+          "damage",
+          "ammoType",
+          "ammoSpeed",
+          "fireDelay",
+          "weaponLength",
+          "sound"
+        ]
+      }
+    }
+  },
+  "required": ["ammoDamage", "weapons"]
+}

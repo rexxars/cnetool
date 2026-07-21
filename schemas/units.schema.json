@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "cnetool unit stat table (data3/mdata3)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Path to this JSON schema, enabling editor autocomplete."
+    },
+    "units": {
+      "type": "array",
+      "description": "All unit/entity stat records, in table order.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The unit/entity's identifier (a developer label), e.g. \"airplane\"."
+          },
+          "armor": {
+            "type": "string",
+            "enum": ["heavy", "light", "none"],
+            "description": "Armor class; selects which column of a weapon's ammo-damage matrix applies to this unit. Optional - omit it and the engine defaults to \"none\"."
+          },
+          "health": {
+            "type": "integer",
+            "description": "Hit points; the engine reads this as an integer."
+          },
+          "fireDelay": {
+            "type": "number",
+            "description": "Seconds between shots for this entity (its fire cadence)."
+          }
+        },
+        "required": ["name", "health", "fireDelay"]
+      }
+    }
+  },
+  "required": ["units"]
+}
