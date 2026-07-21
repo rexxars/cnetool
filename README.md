@@ -24,6 +24,28 @@ npx cnetool extract textures.dat
 
 ## CLI usage
 
+### `cnetool init <game-dir> [project-dir]`
+
+Extract a whole Codename Eagle install into an editable **project source tree**: texture archives become PNGs, stat tables and settings blobs become JSON, object archives explode into per-model OBJ directories, and everything else is copied through - all under `<project-dir>/source/`. A `cnetool.json` manifest records the game path so `cnetool build` can re-encode a loadable install.
+
+```bash
+cnetool init /path/to/game            # into the current directory
+cnetool init /path/to/game my-mod     # into a new project directory
+```
+
+`project-dir` defaults to the current directory and must be empty or a fresh path. See [`docs/project.md`](./docs/project.md) for the source-tree layout and round-trip fidelity.
+
+### `cnetool build [project-dir]`
+
+Re-encode a project's `source/` tree into a complete, loadable game install under `output/` - the inverse of `init`. Texture directories repack into archives, stat/settings JSON re-serialize to binary, config texts re-encode, object directories repack, and sounds/animations/raw files are copied through. Formats without an encoder are carried as verbatim passthrough, so the rebuilt install is always complete.
+
+```bash
+cnetool build                     # build the project containing the current dir
+cnetool build my-mod --no-cache   # build a specific project, ignoring the cache
+```
+
+`project-dir` defaults to the nearest ancestor directory containing a `cnetool.json`. Pass `--no-cache` to re-copy every passthrough file (the build cache otherwise skips unchanged ones). See [`docs/project.md`](./docs/project.md).
+
 ### `cnetool extract <archive...>`
 
 Extract every entry from one or more archives. Textures become standalone TGA files; other entries are written as their raw stored blobs.
@@ -457,6 +479,7 @@ The full API reference and the reverse-engineering notes on the game's data live
 - [`formats.md`](./docs/formats.md) - confirmed file formats
 - [`scripts.md`](./docs/scripts.md) - the scripting guide: execution model, variables, engine callbacks, and the 128 `REF` built-in functions
 - [`files.md`](./docs/files.md) - inventory of a Codename Eagle install, by kind
+- [`project.md`](./docs/project.md) - the `init`/`build` project source-tree workflow
 - [`game-flow.md`](./docs/game-flow.md) - how the formats tie together (boot → level → scripts)
 - [`network.md`](./docs/network.md) - multiplayer: server discovery and the wire protocol
 - [`new-level-recipe.md`](./docs/new-level-recipe.md) - step-by-step recipe for building a new level
