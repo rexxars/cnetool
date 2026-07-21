@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "cnetool archive entry sidecar",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Path to this JSON schema, enabling editor autocomplete."
+    },
+    "entries": {
+      "type": "array",
+      "description": "The archive entries in original order, mapping on-disk files to their stored names.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": "The on-disk filename in this directory (lowercase)."
+          },
+          "name": {
+            "type": "string",
+            "description": "The original archive entry name, preserving casing and order for byte-identical repacking."
+          }
+        },
+        "required": ["file", "name"]
+      }
+    }
+  },
+  "required": ["entries"]
+}

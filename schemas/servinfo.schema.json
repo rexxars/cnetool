@@ -1,0 +1,29 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "cnetool server match settings (servinfo.dat)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Path to this JSON schema, enabling editor autocomplete."
+    },
+    "fragLimit": {
+      "type": "integer",
+      "description": "Kill limit that ends the round (0 = no limit)."
+    },
+    "scoreLimit": {
+      "type": "integer",
+      "description": "Score limit that ends the round (0 = no limit)."
+    },
+    "timeLimit": {
+      "type": "integer",
+      "description": "Time limit in minutes that ends the round (0 = no limit)."
+    },
+    "nextMap": {
+      "type": "integer",
+      "description": "Map-rotation target: the level number to switch to when a round ends (0 disables rotation)."
+    }
+  },
+  "required": ["fragLimit", "scoreLimit", "timeLimit", "nextMap"]
+}

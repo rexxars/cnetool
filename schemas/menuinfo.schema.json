@@ -1,0 +1,125 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "cnetool menu profile / options (menuinfo.dat)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Path to this JSON schema, enabling editor autocomplete."
+    },
+    "lastLevel": {
+      "type": "integer",
+      "description": "Last-played level: single-player campaign number, or a multiplayer map (>= 128)."
+    },
+    "multiplayer": {
+      "type": "boolean",
+      "description": "Whether the last level was a multiplayer map."
+    },
+    "maxPlayers": {
+      "type": "integer",
+      "description": "Maximum number of players for a hosted game."
+    },
+    "networkProtocol": {
+      "type": "integer",
+      "description": "Network protocol: 1 = TCP/IP, 0 = IPX."
+    },
+    "serverIp": {
+      "type": "string",
+      "description": "Last-connected server IPv4 address, as a dotted-quad string (the port is not stored)."
+    },
+    "hostName": {
+      "type": "string",
+      "description": "Host / server name (at most 39 characters)."
+    },
+    "playerName": {
+      "type": "string",
+      "description": "Player name (at most 19 characters; the host truncates it to 10 over the wire)."
+    },
+    "gameMode": {
+      "type": "integer",
+      "description": "Game mode: 0 = deathmatch, 1 = ctf, 2 = teamplay."
+    },
+    "saveSlot": {
+      "type": "integer",
+      "description": "Savegame slot: 0xffff (65535) = none, 0xfffe (65534) = temp.dat, N = sg<N>.dat."
+    },
+    "team": {
+      "type": "integer",
+      "description": "Team: 0 = red, 1 = blue, 2 = auto (a directive; saved files hold 0 or 1)."
+    },
+    "soundVolume": {
+      "type": "integer",
+      "description": "Sound-effects volume, 0-255."
+    },
+    "musicVolume": {
+      "type": "integer",
+      "description": "Music volume, 0-255."
+    },
+    "soundChannels": {
+      "type": "integer",
+      "description": "Number of sound channels: 4, 8, or 16."
+    },
+    "detail": {
+      "type": "integer",
+      "description": "Detail level: 0 = low, 128 = medium, 255 = max."
+    },
+    "graphicFx": {
+      "type": "integer",
+      "description": "Graphic FX level: 0 = none, 128 = medium, 255 = max."
+    },
+    "renderer": {
+      "type": "integer",
+      "description": "Renderer: 0 = 3dfx/Glide, 1 = Direct3D, 2 = software."
+    },
+    "resolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Display mode (changing the renderer rewrites all three fields).",
+      "properties": {
+        "width": {
+          "type": "integer",
+          "description": "Display width in pixels."
+        },
+        "height": {
+          "type": "integer",
+          "description": "Display height in pixels."
+        },
+        "depth": {
+          "type": "integer",
+          "description": "Color depth in bits per pixel."
+        }
+      },
+      "required": ["width", "height", "depth"]
+    },
+    "language": {
+      "type": "integer",
+      "description": "Language: 1 = English, 2 = Spanish, 3 = Italian, 4 = French, 5 = German."
+    },
+    "subtitles": {
+      "type": "boolean",
+      "description": "Whether in-game subtitles are enabled."
+    }
+  },
+  "required": [
+    "lastLevel",
+    "multiplayer",
+    "maxPlayers",
+    "networkProtocol",
+    "serverIp",
+    "hostName",
+    "playerName",
+    "gameMode",
+    "saveSlot",
+    "team",
+    "soundVolume",
+    "musicVolume",
+    "soundChannels",
+    "detail",
+    "graphicFx",
+    "renderer",
+    "resolution",
+    "language",
+    "subtitles"
+  ]
+}

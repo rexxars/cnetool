@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "cnetool project manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Path to this JSON schema, enabling editor autocomplete."
+    },
+    "game": {
+      "type": "string",
+      "description": "Path to the Codename Eagle install this project was initialized from."
+    },
+    "deploy": {
+      "type": "string",
+      "description": "Optional deploy target: game directory that `cnetool deploy` copies changed output files into."
+    }
+  },
+  "required": ["game"]
+}

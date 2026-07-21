@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "cnetool stat table",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Path to this JSON schema, enabling editor autocomplete."
+    },
+    "fields": {
+      "type": "array",
+      "description": "The deobfuscated stat fields, in table order.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "The stat field name, e.g. Name, Armor, or Health."
+          },
+          "value": {
+            "type": "string",
+            "description": "The field's value, represented as text."
+          },
+          "chunk": {
+            "type": "integer",
+            "description": "The 127-byte slot index the field belongs to, preserved so sparse tables round-trip byte-for-byte."
+          }
+        },
+        "required": ["key", "value", "chunk"]
+      }
+    }
+  },
+  "required": ["fields"]
+}

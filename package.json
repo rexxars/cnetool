@@ -19,7 +19,8 @@
   },
   "files": [
     "dist",
-    "docs"
+    "docs",
+    "schemas"
   ],
   "type": "module",
   "sideEffects": false,
