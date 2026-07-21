@@ -39,10 +39,10 @@ describe('domain tables', () => {
     ])
   })
   test('texture archives carry install path and source dir', () => {
-    expect(TEXTURE_ARCHIVES.map((a) => a.sourceDir)).toEqual([
-      'textures.dat',
-      'texsec.dat',
-      'menupics.dat',
+    expect(TEXTURE_ARCHIVES).toEqual([
+      {installPath: '24bits/textures.dat', sourceDir: 'textures.dat'},
+      {installPath: '24bits/texsec.dat', sourceDir: 'texsec.dat'},
+      {installPath: 'menu/menupics.dat', sourceDir: 'menupics.dat'},
     ])
   })
 })
