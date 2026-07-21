@@ -5,10 +5,16 @@ import {basename, dirname, join, relative, sep} from 'node:path'
 import {
   formatMenuInfo,
   formatServerInfo,
-  formatStatTable,
-  setStatField,
+  serializeUnitTable,
+  serializeWeaponTable,
+  type AmmoType,
+  type ArmorDamage,
   type MenuInfo,
   type ServerInfo,
+  type Unit,
+  type UnitArmor,
+  type Weapon,
+  type WeaponTable,
 } from '../api/index.ts'
 import {buildArchiveDirTexture} from './archive-dir.ts'
 import {isFresh, loadCache, putEntry, saveCache, type BuildCache} from './cache.ts'
@@ -64,7 +70,7 @@ export async function buildProject(projectDir: string, options: BuildOptions = {
   const produced = new Set<string>()
 
   await buildTextures(sourceDir, outputDir, produced)
-  await buildStats(projectDir, sourceDir, outputDir, produced)
+  await buildStats(sourceDir, outputDir, produced)
   await buildSettings(projectDir, sourceDir, outputDir, produced)
   await buildConfig(sourceDir, outputDir, produced)
   await buildObjects(sourceDir, outputDir, produced)
@@ -95,47 +101,20 @@ async function buildTextures(
 }
 
 async function buildStats(
-  projectDir: string,
   sourceDir: string,
   outputDir: string,
   produced: Set<string>,
 ): Promise<void> {
-  const baseDir = join(projectDir, '.cnetool', 'base')
   for (const spec of STAT_TABLES) {
     const path = join(sourceDir, 'stats', spec.source)
     if (!(await pathExists(path))) continue
-    const fields = readStatFields(await readFile(path, 'utf8'), spec.source)
-    const base = await readFileOrNull(join(baseDir, spec.file))
-    await writeOutput(
-      outputDir,
-      join(outputDir, spec.file),
-      rebuildStatTable(fields, base),
-      produced,
-    )
+    const raw = await readFile(path, 'utf8')
+    const bytes =
+      spec.kind === 'units'
+        ? serializeUnitTable(readUnitsJson(raw, spec.source))
+        : serializeWeaponTable(readWeaponsJson(raw, spec.source))
+    await writeOutput(outputDir, join(outputDir, spec.file), bytes, produced)
   }
-}
-
-/**
- * Rebuild a stat-table blob. When a pristine base exists (`.cnetool/base/<file>`,
- * captured at init), overlay each field's text onto it with {@link setStatField},
- * preserving the binary ballistics/damage tables the chunks carry past the
- * `Key:Value` line — byte-identical for an unmodified project. Only when no base
- * is present (e.g. a hand-authored stat file with no original) does it fall back
- * to {@link formatStatTable}, which zero-fills the chunk tails; that path is
- * best-effort and can't preserve binary payload it never saw.
- */
-function rebuildStatTable(fields: StatFieldInput[], base: Uint8Array | null): Uint8Array {
-  if (base === null) return formatStatTable(fields)
-  let data = base
-  for (const field of fields) {
-    if (field.chunk === undefined) {
-      throw new Error(
-        `stat field "${field.key}" has no "chunk" index; cannot overlay onto the base — re-run "cnetool init" or add a numeric "chunk".`,
-      )
-    }
-    data = setStatField(data, field.chunk, field.key, field.value)
-  }
-  return data
 }
 
 async function buildSettings(
@@ -262,16 +241,6 @@ function toRel(outputDir: string, path: string): string {
   return relative(outputDir, path).split(sep).join('/')
 }
 
-/** Read a file's bytes, or `null` when it does not exist. */
-async function readFileOrNull(path: string): Promise<Uint8Array | null> {
-  try {
-    return await readFile(path)
-  } catch (error) {
-    if (isEnoent(error)) return null
-    throw error
-  }
-}
-
 /**
  * Recursively remove now-empty directories under `root` (bottom-up), leaving
  * `root` itself in place. Run after pruning orphaned files so directories whose
@@ -322,36 +291,99 @@ function bool(record: Record<string, unknown>, key: string, label: string): bool
   return value
 }
 
-/** A stat field read from source JSON: `key`/`value`, plus the `chunk` index the
- * base-overlay rebuild needs to place it (optional — only the no-base fallback,
- * {@link formatStatTable}, can proceed without it). */
-interface StatFieldInput {
-  key: string
-  value: string
-  chunk?: number
+const UNIT_ARMORS: UnitArmor[] = ['heavy', 'light', 'none']
+const AMMO_TYPES: AmmoType[] = ['bullet', 'gas', 'shell']
+
+// Narrow a JSON string to a `UnitArmor`, or throw naming the offending value.
+function armor(record: Record<string, unknown>, key: string, label: string): UnitArmor {
+  const value = str(record, key, label)
+  const match = UNIT_ARMORS.find((a) => a === value)
+  if (match === undefined) {
+    throw new Error(`${label}: "${key}" must be one of ${UNIT_ARMORS.join(', ')} (got "${value}")`)
+  }
+  return match
 }
 
-// The `chunk` index (written by init) is required to overlay onto the pristine
-// base; it stays optional here so a hand-authored stat file without a base can
-// still fall back to `formatStatTable`. `rebuildStatTable` enforces its presence
-// when a base exists.
-function readStatFields(raw: string, source: string): StatFieldInput[] {
+// Narrow a JSON string to an `AmmoType`, or throw naming the offending value.
+function ammoType(record: Record<string, unknown>, key: string, label: string): AmmoType {
+  const value = str(record, key, label)
+  const match = AMMO_TYPES.find((a) => a === value)
+  if (match === undefined) {
+    throw new Error(`${label}: "${key}" must be one of ${AMMO_TYPES.join(', ')} (got "${value}")`)
+  }
+  return match
+}
+
+/** Parse `source/stats/<units>.json` (`{units: [...]}`) into typed {@link Unit}s. */
+function readUnitsJson(raw: string, source: string): Unit[] {
   const label = `stats source ${source}`
   const record = asRecord(parseJson(raw, label), label)
-  const {fields} = record
-  if (!Array.isArray(fields)) throw new Error(`${label}: "fields" must be an array`)
-  return fields.map((entry, index) => {
-    const fieldLabel = `${label} field ${index}`
-    const field = asRecord(entry, fieldLabel)
-    const result: StatFieldInput = {
-      key: str(field, 'key', fieldLabel),
-      value: str(field, 'value', fieldLabel),
+  const {units} = record
+  if (!Array.isArray(units)) throw new Error(`${label}: "units" must be an array`)
+  return units.map((entry, index) => {
+    const unitLabel = `${label} unit ${index}`
+    const unit = asRecord(entry, unitLabel)
+    const result: Unit = {
+      name: str(unit, 'name', unitLabel),
+      health: num(unit, 'health', unitLabel),
+      fireDelay: num(unit, 'fireDelay', unitLabel),
     }
-    if ('chunk' in field && field.chunk !== undefined) {
-      result.chunk = num(field, 'chunk', fieldLabel)
+    if ('armor' in unit && unit.armor !== undefined) {
+      result.armor = armor(unit, 'armor', unitLabel)
     }
     return result
   })
+}
+
+/** Parse one damage-vs-armor row (`{heavy, light, none}`) into an {@link ArmorDamage}. */
+function readArmorDamage(value: unknown, label: string): ArmorDamage {
+  const record = asRecord(value, label)
+  return {
+    heavy: num(record, 'heavy', label),
+    light: num(record, 'light', label),
+    none: num(record, 'none', label),
+  }
+}
+
+/**
+ * Parse `source/stats/<weapons>.json` (`{ammoDamage, weapons: [...]}`) into a
+ * typed {@link WeaponTable}. Each weapon's `index` must equal its array position
+ * (how the engine selects it); a mismatch throws naming both values.
+ */
+function readWeaponsJson(raw: string, source: string): WeaponTable {
+  const label = `stats source ${source}`
+  const record = asRecord(parseJson(raw, label), label)
+  const ammoRecord = asRecord(record.ammoDamage, `${label} ammoDamage`)
+  const ammoDamage: Record<AmmoType, ArmorDamage> = {
+    bullet: readArmorDamage(ammoRecord.bullet, `${label} ammoDamage.bullet`),
+    gas: readArmorDamage(ammoRecord.gas, `${label} ammoDamage.gas`),
+    shell: readArmorDamage(ammoRecord.shell, `${label} ammoDamage.shell`),
+  }
+
+  const {weapons} = record
+  if (!Array.isArray(weapons)) throw new Error(`${label}: "weapons" must be an array`)
+  const parsed = weapons.map((entry, index) => {
+    const weaponLabel = `${label} weapon ${index}`
+    const weapon = asRecord(entry, weaponLabel)
+    const weaponIndex = num(weapon, 'index', weaponLabel)
+    if (weaponIndex !== index) {
+      throw new Error(
+        `${weaponLabel}: "index" is ${weaponIndex} but the weapon is at array position ${index}; they must match.`,
+      )
+    }
+    const result: Weapon = {
+      index,
+      name: str(weapon, 'name', weaponLabel),
+      damage: num(weapon, 'damage', weaponLabel),
+      ammoType: ammoType(weapon, 'ammoType', weaponLabel),
+      ammoSpeed: num(weapon, 'ammoSpeed', weaponLabel),
+      fireDelay: num(weapon, 'fireDelay', weaponLabel),
+      weaponLength: num(weapon, 'weaponLength', weaponLabel),
+      sound: str(weapon, 'sound', weaponLabel),
+    }
+    return result
+  })
+  return {ammoDamage, weapons: parsed}
 }
 
 function readMenuInfo(raw: string): MenuInfo {

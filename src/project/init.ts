@@ -2,7 +2,7 @@
 import {mkdir, readFile, writeFile} from 'node:fs/promises'
 import {basename, join} from 'node:path'
 
-import {parseMenuInfo, parseServerInfo, parseStatTable} from '../api/index.ts'
+import {parseMenuInfo, parseServerInfo, parseUnitTable, parseWeaponTable} from '../api/index.ts'
 import {extractArchiveDir} from './archive-dir.ts'
 import {copyThrough, pathExists, walkFiles} from './fsutil.ts'
 import {
@@ -76,26 +76,32 @@ export async function initProject(gameDir: string, projectDir: string): Promise<
     await extractArchiveDir(bytes, join(texturesRoot, spec.sourceDir))
   }
 
-  // 2. Stat tables -> source/stats/<source> (JSON) + pristine base for overlay.
-  // Build re-applies the JSON fields onto the original bytes (which carry binary
-  // ballistics/damage tables past the Key:Value text), so the base must be kept.
+  // 2. Stat tables -> source/stats/<source> (typed JSON). Build re-serializes
+  // the typed shape from scratch (value-identical to stock), so no pristine base
+  // is captured for stats — unlike menuinfo, which is patched over its base below.
   const statsRoot = join(projectDir, 'source', 'stats')
-  const baseDir = join(projectDir, '.cnetool', 'base')
   for (const spec of STAT_TABLES) {
     const abs = claim(map, spec.file.toLowerCase())
     if (abs === undefined) continue
     const bytes = await readFile(abs)
-    const fields = parseStatTable(bytes)
-    await writeJson(join(statsRoot, spec.source), {
-      $schema: '../../.cnetool/schemas/stats.schema.json',
-      fields,
-    })
-    await mkdir(baseDir, {recursive: true})
-    await writeFile(join(baseDir, spec.file), bytes)
+    if (spec.kind === 'units') {
+      await writeJson(join(statsRoot, spec.source), {
+        $schema: '../../.cnetool/schemas/units.schema.json',
+        units: parseUnitTable(bytes),
+      })
+    } else {
+      const table = parseWeaponTable(bytes)
+      await writeJson(join(statsRoot, spec.source), {
+        $schema: '../../.cnetool/schemas/weapons.schema.json',
+        ammoDamage: table.ammoDamage,
+        weapons: table.weapons,
+      })
+    }
   }
 
   // 3. Settings -> source/settings/*.json (+ pristine menuinfo base)
   const settingsRoot = join(projectDir, 'source', 'settings')
+  const baseDir = join(projectDir, '.cnetool', 'base')
   const menuInfoAbs = claim(map, 'menuinfo.dat')
   if (menuInfoAbs !== undefined) {
     const bytes = await readFile(menuInfoAbs)

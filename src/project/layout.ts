@@ -14,13 +14,15 @@ export const TEXTURE_ARCHIVES: TextureArchiveSpec[] = [
 export interface StatTableSpec {
   file: string
   source: string
+  /** Which typed codec decodes/encodes this table. */
+  kind: 'units' | 'weapons'
 }
 
 export const STAT_TABLES: StatTableSpec[] = [
-  {file: 'data3.bin', source: 'units.json'},
-  {file: 'data4.bin', source: 'weapons.json'},
-  {file: 'mdata3.bin', source: 'units-mp.json'},
-  {file: 'mdata4.bin', source: 'weapons-mp.json'},
+  {file: 'data3.bin', source: 'units.json', kind: 'units'},
+  {file: 'data4.bin', source: 'weapons.json', kind: 'weapons'},
+  {file: 'mdata3.bin', source: 'units-mp.json', kind: 'units'},
+  {file: 'mdata4.bin', source: 'weapons-mp.json', kind: 'weapons'},
 ]
 
 export interface ConfigFileSpec {
