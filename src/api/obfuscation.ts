@@ -1,10 +1,13 @@
 import {OBFUSCATION_KEY} from './constants.ts'
 
 /**
- * Reverse the byte obfuscation used by some config files (`data3.bin`,
- * `data4.bin`): subtract {@link OBFUSCATION_KEY} from every byte. The result is
- * the original content - text records (readable with `parseConfig`'s `scan`
- * mode) interleaved with binary numeric fields.
+ * Reverse the byte obfuscation used by the stat tables (`data3.bin`,
+ * `data4.bin`, and the `mdata*` variants): subtract {@link OBFUSCATION_KEY}
+ * from every byte. Each table is a flat array of fixed 127-byte slots, and each
+ * slot holds one NUL-terminated `Key:Value\n` text line (the bytes after the
+ * NUL are ignored filler, not data); see `stattable.ts` for the slot codec.
+ * This is the raw whole-array transform — the engine deobfuscates only up to
+ * the first NUL per slot.
  *
  * @param data - Obfuscated bytes.
  * @returns A new array of deobfuscated bytes.
