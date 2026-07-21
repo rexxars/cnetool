@@ -3,8 +3,10 @@
 import {readFileSync} from 'node:fs'
 import {join} from 'node:path'
 
+import {runBuild} from './cli/build.ts'
 import {runConvert} from './cli/convert.ts'
 import {runExtract} from './cli/extract.ts'
+import {runInit} from './cli/init.ts'
 import {runLevel} from './cli/level.ts'
 import {runMenuInfo} from './cli/menuinfo.ts'
 import {runMesh} from './cli/mesh.ts'
@@ -20,6 +22,8 @@ const usage = `cnetool - tools for Codename Eagle game data files
 Usage: cnetool <command> [options]
 
 Commands:
+  init <game-dir> [dir]    Extract a game install into an editable project tree
+  build [project-dir]      Re-encode a project's source tree into output/
   extract <archive...>     Extract entries from an archive (textures -> TGA/PNG)
   mesh <objects.dat> ...   Export raw project meshes to OBJ files
   object <objects.dat> ... Export assembled models (incl. controllable vehicles) to OBJ
@@ -39,6 +43,12 @@ async function main(argv: string[]): Promise<void> {
   const [command, ...rest] = argv
 
   switch (command) {
+    case 'init':
+      await runInit(rest)
+      return
+    case 'build':
+      await runBuild(rest)
+      return
     case 'extract':
       await runExtract(rest)
       return
