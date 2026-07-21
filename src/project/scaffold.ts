@@ -48,8 +48,13 @@ export async function readManifest(projectDir: string): Promise<ProjectManifest>
     throw error
   }
 
-  const parsed: unknown = JSON.parse(raw)
-  if (typeof parsed !== 'object' || parsed === null) {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch (error) {
+    throw new Error(`Invalid cnetool.json in ${projectDir}: not valid JSON.`, {cause: error})
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
     throw new Error(`Invalid cnetool.json in ${projectDir}: expected a JSON object.`)
   }
 
@@ -62,8 +67,8 @@ export async function readManifest(projectDir: string): Promise<ProjectManifest>
 
   const deploy = 'deploy' in parsed ? parsed.deploy : undefined
   if (deploy !== undefined) {
-    if (typeof deploy !== 'string') {
-      throw new Error(`Invalid cnetool.json in ${projectDir}: "deploy" must be a string.`)
+    if (typeof deploy !== 'string' || deploy.length === 0) {
+      throw new Error(`Invalid cnetool.json in ${projectDir}: "deploy" must be a non-empty string.`)
     }
     manifest.deploy = deploy
   }

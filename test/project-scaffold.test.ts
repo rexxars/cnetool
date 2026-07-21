@@ -72,6 +72,40 @@ describe('readManifest', () => {
     await writeFile(join(dir, 'cnetool.json'), JSON.stringify({game: 123}))
     await expect(readManifest(dir)).rejects.toThrow(/game/)
   })
+
+  test('throws a wrapped "Invalid cnetool.json" error on malformed JSON', async () => {
+    const dir = await tmp()
+    await writeFile(join(dir, 'cnetool.json'), '{ bad json,')
+    const error = await readManifest(dir).catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(Error)
+    expect(error).not.toBeInstanceOf(SyntaxError)
+    if (!(error instanceof Error)) throw new Error('expected an Error')
+    expect(error.message).toMatch(/Invalid cnetool\.json/)
+  })
+
+  test('throws when deploy is present but not a string', async () => {
+    const dir = await tmp()
+    await writeFile(join(dir, 'cnetool.json'), JSON.stringify({game: 'x', deploy: 123}))
+    await expect(readManifest(dir)).rejects.toThrow(/deploy/)
+  })
+
+  test('throws when deploy is an empty string', async () => {
+    const dir = await tmp()
+    await writeFile(join(dir, 'cnetool.json'), JSON.stringify({game: 'x', deploy: ''}))
+    await expect(readManifest(dir)).rejects.toThrow(/deploy/)
+  })
+
+  test('throws "expected a JSON object" for a top-level number', async () => {
+    const dir = await tmp()
+    await writeFile(join(dir, 'cnetool.json'), '123')
+    await expect(readManifest(dir)).rejects.toThrow(/expected a JSON object/)
+  })
+
+  test('throws "expected a JSON object" for a top-level array', async () => {
+    const dir = await tmp()
+    await writeFile(join(dir, 'cnetool.json'), '[]')
+    await expect(readManifest(dir)).rejects.toThrow(/expected a JSON object/)
+  })
 })
 
 describe('scaffoldProject', () => {
