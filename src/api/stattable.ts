@@ -133,10 +133,22 @@ export function packStatSlot(text: string): Uint8Array {
       }-byte limit (one byte is reserved for the NUL terminator)`,
     )
   }
+  const obfuscated = obfuscate(line)
+  // A text byte of 0x88 obfuscates to 0x00, which the engine's unbounded scan
+  // would mistake for the terminator and stop mid-line. It can't happen for
+  // ASCII `key:value` text, but this is the reusable base for the serializers,
+  // so make the guarantee airtight.
+  for (let i = 0; i < obfuscated.length; i++) {
+    if (obfuscated[i] === 0x00) {
+      throw new RangeError(
+        `stat record "${text}" has a byte at index ${i} that obfuscates to 0x00, which would terminate the slot mid-line`,
+      )
+    }
+  }
   const slot = new Uint8Array(STAT_CHUNK_SIZE)
   // Obfuscate only the text; the terminator (slot[line.length]) and the filler
   // stay a literal 0x00 (the array is already zero-initialised).
-  slot.set(obfuscate(line), 0)
+  slot.set(obfuscated, 0)
   return slot
 }
 

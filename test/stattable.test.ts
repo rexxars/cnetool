@@ -149,6 +149,30 @@ describe('packStatSlot', () => {
     expect(() => packStatSlot('K'.repeat(200))).toThrow(RangeError)
     expect(() => packStatSlot('K'.repeat(200))).toThrow(/exceed/i)
   })
+
+  test('throws when a text byte obfuscates to 0x00 (would terminate mid-line)', () => {
+    // char code 0x88 + 0x78 (obfuscation key) wraps to 0x00
+    expect(() => packStatSlot(`Name:${String.fromCharCode(0x88)}X`)).toThrow(RangeError)
+    expect(() => packStatSlot(`Name:${String.fromCharCode(0x88)}X`)).toThrow(/0x00/)
+  })
+
+  test('packs a line that is exactly STAT_CHUNK_SIZE - 1 bytes (terminator is the last byte)', () => {
+    // key:value plus the appended "\n" is exactly 126 bytes; terminator sits at 126
+    const value = 'v'.repeat(STAT_CHUNK_SIZE - 1 - 'Name:'.length - 1)
+    const text = `Name:${value}`
+    expect(`${text}\n`.length).toBe(STAT_CHUNK_SIZE - 1)
+    const slot = packStatSlot(text)
+    expect(scanToTerminator(slot)).toBe(STAT_CHUNK_SIZE - 1)
+    expect(slot[STAT_CHUNK_SIZE - 1]).toBe(0x00)
+    expect(parseStatTable(slot)).toEqual([{key: 'Name', value, chunk: 0}])
+  })
+
+  test('throws when the line (with newline) is exactly STAT_CHUNK_SIZE bytes', () => {
+    // one byte longer than the case above: 127-byte line leaves no room for the terminator
+    const text = `Name:${'v'.repeat(STAT_CHUNK_SIZE - 'Name:'.length - 1)}`
+    expect(`${text}\n`.length).toBe(STAT_CHUNK_SIZE)
+    expect(() => packStatSlot(text)).toThrow(RangeError)
+  })
 })
 
 describe('formatStatTable', () => {
