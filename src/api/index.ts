@@ -96,11 +96,13 @@ export {
   formatStatTable,
   packStatSlot,
   parseStatTable,
+  parseUnitTable,
+  serializeUnitTable,
   setStatField,
   setStatValue,
   STAT_CHUNK_SIZE,
 } from './stattable.ts'
-export type {StatField} from './stattable.ts'
+export type {StatField, Unit, UnitArmor} from './stattable.ts'
 export {buildArchive, buildTextureArchive, parseArchive} from './parse.ts'
 export type {ArchiveInputEntry} from './parse.ts'
 export {decodeMenuInfo, encodeMenuInfo, formatMenuInfo, parseMenuInfo} from './menuinfo.ts'

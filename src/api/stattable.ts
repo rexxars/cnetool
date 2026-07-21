@@ -1,4 +1,5 @@
 import type {ConfigEntry} from './types.ts'
+import {groupRecords} from './config.ts'
 import {deobfuscate, obfuscate} from './obfuscation.ts'
 
 /**
@@ -170,5 +171,139 @@ export function formatStatTable(fields: Iterable<ConfigEntry>): Uint8Array {
   list.forEach((field, i) => {
     out.set(packStatSlot(`${field.key}:${field.value}`), i * STAT_CHUNK_SIZE)
   })
+  return out
+}
+
+/** Armor class of a {@link Unit}, lowercased. */
+export type UnitArmor = 'heavy' | 'light' | 'none'
+
+/**
+ * One unit's stats from the obfuscated unit table (`data3.bin` / `mdata3.bin`).
+ * The engine stores each unit as a run of fixed slots delimited by a `Name` line;
+ * see {@link parseUnitTable}.
+ */
+export interface Unit {
+  /** Unit name (the `Name` field), eg `airplane`. */
+  name: string
+  /**
+   * Armor class (`Armor` field), lowercased. Optional: some units omit the slot
+   * entirely, and the engine defaults such units to `none`.
+   */
+  armor?: UnitArmor
+  /** Hit points (the `Health` field, parsed `%d`). */
+  health: number
+  /** Refire delay (the `Firedelay` field - lowercase `d` - parsed `%f`). */
+  fireDelay: number
+}
+
+// The engine `stricmp`s the Armor value case-insensitively; "No" is an accepted
+// spelling of "None". Values map to the lowercased union.
+const ARMOR_BY_VALUE = new Map<string, UnitArmor>([
+  ['heavy', 'heavy'],
+  ['light', 'light'],
+  ['none', 'none'],
+  ['no', 'none'],
+])
+
+// Stock capitalization for each armor class, as written in the shipped tables.
+const ARMOR_LABEL: Record<UnitArmor, string> = {heavy: 'Heavy', light: 'Light', none: 'None'}
+
+function parseArmor(value: string, name: string): UnitArmor {
+  const armor = ARMOR_BY_VALUE.get(value.trim().toLowerCase())
+  if (armor === undefined) {
+    throw new Error(
+      `unit "${name}" has an unrecognized Armor value "${value.trim()}" (expected Heavy, Light, or None)`,
+    )
+  }
+  return armor
+}
+
+// Read the single field expected at `pos`, asserting its key. Returns the trimmed
+// value, or throws a clear error naming the unit and the mismatch.
+function expectField(record: StatField[], pos: number, key: string, name: string): string {
+  const field = record[pos]
+  if (field === undefined || field.key !== key) {
+    throw new Error(
+      `unit "${name}" is missing a "${key}" field (found "${field?.key ?? '<end of record>'}" at position ${pos})`,
+    )
+  }
+  return field.value.trim()
+}
+
+function parseUnitRecord(record: StatField[], index: number): Unit {
+  const nameField = record[0]
+  if (nameField === undefined || nameField.key !== 'Name') {
+    throw new Error(`unit record ${index} does not start with a Name field`)
+  }
+  const name = nameField.value.trim()
+
+  // Armor is optional and, when present, immediately follows Name.
+  let pos = 1
+  let armor: UnitArmor | undefined
+  const maybeArmor = record[pos]
+  if (maybeArmor !== undefined && maybeArmor.key === 'Armor') {
+    armor = parseArmor(maybeArmor.value, name)
+    pos++
+  }
+
+  const healthText = expectField(record, pos, 'Health', name)
+  pos++
+  const health = Number.parseInt(healthText, 10)
+  if (!Number.isFinite(health)) {
+    throw new Error(`unit "${name}" has a non-integer Health value "${healthText}"`)
+  }
+
+  const fireText = expectField(record, pos, 'Firedelay', name)
+  pos++
+  const fireDelay = Number.parseFloat(fireText)
+  if (!Number.isFinite(fireDelay)) {
+    throw new Error(`unit "${name}" has a non-numeric Firedelay value "${fireText}"`)
+  }
+
+  if (pos !== record.length) {
+    throw new Error(
+      `unit "${name}" has an unexpected trailing field "${record[pos]!.key}" (expected only Name, Armor?, Health, Firedelay)`,
+    )
+  }
+
+  const unit: Unit = {name, health, fireDelay}
+  if (armor !== undefined) unit.armor = armor
+  return unit
+}
+
+/**
+ * Parse an obfuscated **unit** stat table (`data3.bin` / `mdata3.bin`) into typed
+ * {@link Unit} records. The engine stores each unit as a run of fixed slots
+ * delimited by a `Name` line, in the order `Name`, optional `Armor`, `Health`,
+ * `Firedelay` (note the lowercase `d`); this reads them in that strict sequence.
+ *
+ * @param data - The raw (obfuscated) file bytes.
+ * @throws Error if a record is missing a required field, has an unexpected key
+ *   sequence, or carries an unrecognized `Armor` value.
+ */
+export function parseUnitTable(data: Uint8Array): Unit[] {
+  const records = groupRecords(parseStatTable(data), 'Name')
+  return records.map((record, index) => parseUnitRecord(record, index))
+}
+
+/**
+ * Serialize typed {@link Unit} records back into an obfuscated, engine-loadable
+ * unit table. Each unit emits slots via {@link packStatSlot} in the fixed order
+ * `Name`, `Armor` (only when set, capitalized to the stock `Heavy`/`Light`/`None`),
+ * `Health`, `Firedelay`. Numbers are written as plain JS (`75`, `0.5`). The result
+ * length is always a multiple of {@link STAT_CHUNK_SIZE}.
+ *
+ * @throws RangeError if any field does not fit in one slot (see {@link packStatSlot}).
+ */
+export function serializeUnitTable(units: Unit[]): Uint8Array {
+  const slots: Uint8Array[] = []
+  for (const unit of units) {
+    slots.push(packStatSlot(`Name:${unit.name}`))
+    if (unit.armor !== undefined) slots.push(packStatSlot(`Armor:${ARMOR_LABEL[unit.armor]}`))
+    slots.push(packStatSlot(`Health:${unit.health}`))
+    slots.push(packStatSlot(`Firedelay:${unit.fireDelay}`))
+  }
+  const out = new Uint8Array(slots.length * STAT_CHUNK_SIZE)
+  slots.forEach((slot, i) => out.set(slot, i * STAT_CHUNK_SIZE))
   return out
 }
