@@ -1,6 +1,6 @@
 // @env node
 import {mkdir, readFile, readdir, writeFile} from 'node:fs/promises'
-import {basename, extname, join} from 'node:path'
+import {basename, extname, isAbsolute, join} from 'node:path'
 
 import {buildTextureArchive, extractEntries, pngToTga, tgaToPng} from '../api/index.ts'
 import type {ArchiveInputEntry} from '../api/index.ts'
@@ -10,6 +10,8 @@ import type {ArchiveInputEntry} from '../api/index.ts'
  * `source/textures/<archive>/entries.json` - three levels below the project root,
  * where `.cnetool/schemas/` sits - so the relative path climbs three directories.
  */
+// Assumes the archive dir sits 3 levels under the project root (source/<domain>/<archive>/),
+// which holds for both texture and object archive directories.
 const ENTRIES_SCHEMA_REF = '../../../.cnetool/schemas/entries.schema.json'
 
 /** One record of an archive directory's `entries.json` sidecar. */
@@ -59,23 +61,29 @@ export async function extractArchiveDir(data: Uint8Array, dir: string): Promise<
 /**
  * Read an archive directory back into the named blobs to repack, the inverse of
  * {@link extractArchiveDir}. Entries listed in `entries.json` come first, in
- * sidecar order, under their original names; any file present in the directory but
- * not listed (a user-added asset) is appended in sorted filename order, named after
- * its filename stem. `.png` files are converted to game-ready TGAs; everything else
- * is read as raw bytes.
+ * sidecar order, under their recorded original names; any file present in the
+ * directory but not listed (a user-added asset) is appended in sorted filename
+ * order. Naming is keyed off the on-disk extension so both archive kinds stay
+ * consistent: a `.png` extra becomes a game-ready TGA named `<stem>.tga` (the only
+ * form the engine recognises as a texture); anything else is read as raw bytes and
+ * named by its bare stem (objects.dat project entries are bare-named).
  *
  * Task 7 (objects) reuses this to gather an object archive's flat entries.
  *
  * @param dir - The archive directory to read.
+ * @throws If a listed file is missing, or an extra's computed name collides with
+ *   an already-included entry name.
  */
 export async function readArchiveDirEntries(dir: string): Promise<ArchiveInputEntry[]> {
   const records = await readSidecar(dir)
   const listed = new Set(records.map((record) => record.file))
   const result: ArchiveInputEntry[] = []
+  const takenNames = new Set<string>()
 
   for (const record of records) {
-    const data = await loadEntryFile(join(dir, record.file))
+    const data = await loadEntryFile(dir, record.file)
     result.push({name: record.name, data})
+    takenNames.add(record.name)
   }
 
   const dirents = await readdir(dir, {withFileTypes: true})
@@ -85,9 +93,19 @@ export async function readArchiveDirEntries(dir: string): Promise<ArchiveInputEn
     .filter((name) => name !== 'entries.json' && !listed.has(name))
     .toSorted()
 
-  for (const name of extras) {
-    const data = await loadEntryFile(join(dir, name))
-    result.push({name: basename(name, extname(name)), data})
+  for (const file of extras) {
+    const data = await loadEntryFile(dir, file)
+    const stem = basename(file, extname(file))
+    // A .png extra is a texture, which the engine only recognises under a `.tga`
+    // name; every other extra keeps a bare stem (objects.dat project entries).
+    const name = file.toLowerCase().endsWith('.png') ? `${stem}.tga` : stem
+    if (takenNames.has(name)) {
+      throw new Error(
+        `added file ${file} in ${dir} maps to entry name "${name}", which is already used`,
+      )
+    }
+    takenNames.add(name)
+    result.push({name, data})
   }
 
   return result
@@ -105,10 +123,20 @@ export async function buildArchiveDirTexture(dir: string): Promise<Uint8Array> {
 
 // Convert one on-disk asset file back to its stored blob: PNGs become game-ready
 // TGAs (rows stored top-down, matching the archive convention), everything else is raw.
-async function loadEntryFile(path: string): Promise<Uint8Array> {
-  const bytes = await readFile(path)
-  if (path.toLowerCase().endsWith('.png')) return pngToTga(bytes, {topDown: true})
+async function loadEntryFile(dir: string, file: string): Promise<Uint8Array> {
+  let bytes: Uint8Array
+  try {
+    bytes = await readFile(join(dir, file))
+  } catch (error) {
+    if (isEnoent(error)) throw new Error(`listed file ${file} missing from ${dir}`, {cause: error})
+    throw error
+  }
+  if (file.toLowerCase().endsWith('.png')) return pngToTga(bytes, {topDown: true})
   return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+}
+
+function isEnoent(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT'
 }
 
 async function readSidecar(dir: string): Promise<EntrySidecarRecord[]> {
@@ -140,6 +168,17 @@ async function readSidecar(dir: string): Promise<EntrySidecarRecord[]> {
     ) {
       throw new Error(
         `Invalid entries.json in ${dir}: entry ${index} must have string "file" and "name".`,
+      )
+    }
+    // Reject path traversal: "file" must be a bare filename within `dir`, never a
+    // separator-bearing, absolute, or ".."-style path that escapes the directory.
+    if (
+      isAbsolute(record.file) ||
+      /[/\\]/.test(record.file) ||
+      basename(record.file) !== record.file
+    ) {
+      throw new Error(
+        `Invalid entries.json in ${dir}: entry ${index} "file" must be a bare filename, got "${record.file}".`,
       )
     }
     return {file: record.file, name: record.name}

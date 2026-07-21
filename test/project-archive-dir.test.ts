@@ -138,7 +138,30 @@ describe('extractArchiveDir / buildArchiveDirTexture', () => {
 
     const rebuilt = await buildArchiveDirTexture(dir)
     const names = parseArchive(rebuilt).entries.map((e) => e.name)
-    expect(names).toEqual(['A_TEX.tga', 'newtex'])
+    // A .png extra must be named "<stem>.tga" - the only form the engine treats
+    // as a texture.
+    expect(names).toEqual(['A_TEX.tga', 'newtex.tga'])
+  })
+
+  test('throws when an added file collides with a sidecar entry name', async () => {
+    // A sidecar entry named "shared.tga" (stored in keep.png) plus a dropped
+    // "shared.png" extra, which also computes to entry name "shared.tga".
+    const dir = await tmp()
+    await writeFile(join(dir, 'keep.png'), encodePng(makeImage(16, 1)))
+    await writeFile(join(dir, 'shared.png'), encodePng(makeImage(16, 2)))
+    await writeFile(
+      join(dir, 'entries.json'),
+      JSON.stringify({entries: [{file: 'keep.png', name: 'shared.tga'}]}),
+    )
+    await expect(readArchiveDirEntries(dir)).rejects.toThrow(/already used/)
+  })
+
+  test('throws a friendly error when a listed file is missing on disk', async () => {
+    const bytes = buildTextureArchive([{name: 'A_TEX.tga', data: tgaFor(makeImage(16, 5))}])
+    const dir = await tmp()
+    await extractArchiveDir(bytes, dir)
+    await rm(join(dir, 'a_tex.png'))
+    await expect(readArchiveDirEntries(dir)).rejects.toThrow(/listed file a_tex\.png missing/)
   })
 
   test('round-trips raw (non-texture) entries as .bin files', async () => {
@@ -163,7 +186,7 @@ describe('extractArchiveDir / buildArchiveDirTexture', () => {
     await writeFile(join(dir, 'alpha.png'), encodePng(makeImage(16, 3)))
 
     const entries = await readArchiveDirEntries(dir)
-    expect(entries.map((e) => e.name)).toEqual(['A_TEX.tga', 'alpha', 'zeta'])
+    expect(entries.map((e) => e.name)).toEqual(['A_TEX.tga', 'alpha.tga', 'zeta.tga'])
   })
 
   test('ignores subdirectories when collecting extras', async () => {
@@ -178,5 +201,41 @@ describe('extractArchiveDir / buildArchiveDirTexture', () => {
     expect(entries.map((e) => e.name)).toEqual(['A_TEX.tga'])
     // sanity: the dir really does contain the subdir
     expect((await readdir(dir)).includes('sub')).toBe(true)
+  })
+})
+
+async function writeSidecar(dir: string, contents: string): Promise<void> {
+  await writeFile(join(dir, 'entries.json'), contents)
+}
+
+describe('readArchiveDirEntries sidecar validation', () => {
+  test('rejects malformed JSON', async () => {
+    const dir = await tmp()
+    await writeSidecar(dir, '{not json')
+    await expect(readArchiveDirEntries(dir)).rejects.toThrow(/not valid JSON/)
+  })
+
+  test('rejects a non-object root', async () => {
+    const dir = await tmp()
+    await writeSidecar(dir, '42')
+    await expect(readArchiveDirEntries(dir)).rejects.toThrow(/expected an object/)
+  })
+
+  test('rejects a non-array "entries"', async () => {
+    const dir = await tmp()
+    await writeSidecar(dir, JSON.stringify({entries: 'nope'}))
+    await expect(readArchiveDirEntries(dir)).rejects.toThrow(/"entries" must be an array/)
+  })
+
+  test('rejects a malformed record (missing name)', async () => {
+    const dir = await tmp()
+    await writeSidecar(dir, JSON.stringify({entries: [{file: 'a.png'}]}))
+    await expect(readArchiveDirEntries(dir)).rejects.toThrow(/must have string "file" and "name"/)
+  })
+
+  test('rejects a path-traversal "file" value', async () => {
+    const dir = await tmp()
+    await writeSidecar(dir, JSON.stringify({entries: [{file: '../../secret', name: 'X.tga'}]}))
+    await expect(readArchiveDirEntries(dir)).rejects.toThrow(/must be a bare filename/)
   })
 })
