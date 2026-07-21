@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "cnetool object project",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Path to this JSON schema, enabling editor autocomplete."
+    },
+    "name": {
+      "type": "string",
+      "description": "The original objects.dat entry name, preserving casing (e.g. StBody)."
+    },
+    "materials": {
+      "type": "object",
+      "description": "One entry per distinct (texId, flags, color, alpha) face tuple, keyed m0, m1, … and referenced by the OBJs' usemtl lines.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "texture": {
+            "type": ["string", "null"],
+            "description": "The source texture filename from objects.dat's texture-name table (e.g. MULT15.TGA), or null for an untextured face."
+          },
+          "flags": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255,
+            "description": "The face render-flags byte."
+          },
+          "color": {
+            "type": "array",
+            "description": "Face diffuse colour as [r, g, b], each 0-255.",
+            "items": {"type": "integer", "minimum": 0, "maximum": 255},
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "alpha": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255,
+            "description": "Face opacity 0-255 (255 = opaque)."
+          }
+        },
+        "required": ["texture", "flags", "color", "alpha"]
+      }
+    }
+  },
+  "required": ["name", "materials"]
+}
