@@ -93,6 +93,7 @@ export {compileScript, compileSource, parse, tokenize} from './compile.ts'
 export type {CompiledHandler, CompiledInstruction, Program} from './compile.ts'
 export {deobfuscate, obfuscate} from './obfuscation.ts'
 export {
+  AMMO_TYPES,
   formatStatTable,
   packStatSlot,
   parseStatTable,
@@ -103,6 +104,7 @@ export {
   setStatField,
   setStatValue,
   STAT_CHUNK_SIZE,
+  UNIT_ARMORS,
 } from './stattable.ts'
 export type {
   AmmoType,

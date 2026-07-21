@@ -3,10 +3,12 @@ import {mkdir, readdir, readFile, rm, rmdir, stat, writeFile} from 'node:fs/prom
 import {basename, dirname, join, relative, sep} from 'node:path'
 
 import {
+  AMMO_TYPES,
   formatMenuInfo,
   formatServerInfo,
   serializeUnitTable,
   serializeWeaponTable,
+  UNIT_ARMORS,
   type AmmoType,
   type ArmorDamage,
   type MenuInfo,
@@ -291,8 +293,16 @@ function bool(record: Record<string, unknown>, key: string, label: string): bool
   return value
 }
 
-const UNIT_ARMORS: UnitArmor[] = ['heavy', 'light', 'none']
-const AMMO_TYPES: AmmoType[] = ['bullet', 'gas', 'shell']
+// Read an integer JSON field, throwing a clear error for a non-integer (fractional
+// or non-number) value — the stat tables store whole numbers the engine reads with
+// `%d`, so a fractional value would be silently truncated on load.
+function int(record: Record<string, unknown>, key: string, label: string): number {
+  const value = num(record, key, label)
+  if (!Number.isInteger(value)) {
+    throw new Error(`${label}: "${key}" must be an integer (got ${value})`)
+  }
+  return value
+}
 
 // Narrow a JSON string to a `UnitArmor`, or throw naming the offending value.
 function armor(record: Record<string, unknown>, key: string, label: string): UnitArmor {
@@ -325,7 +335,7 @@ function readUnitsJson(raw: string, source: string): Unit[] {
     const unit = asRecord(entry, unitLabel)
     const result: Unit = {
       name: str(unit, 'name', unitLabel),
-      health: num(unit, 'health', unitLabel),
+      health: int(unit, 'health', unitLabel),
       fireDelay: num(unit, 'fireDelay', unitLabel),
     }
     if ('armor' in unit && unit.armor !== undefined) {

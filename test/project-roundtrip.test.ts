@@ -399,6 +399,21 @@ describe('project init/build round-trip', () => {
     }
   })
 
+  test('build fails with a clear error on a fractional unit health', async () => {
+    const install = await tmp()
+    const project = await tmp()
+    await makeInstall(install)
+
+    await initProject(install, project)
+    // Hand-edit units.json to a fractional health the engine's %d read can't hold.
+    const unitsPath = join(project, 'source', 'stats', 'units.json')
+    const doc = JSON.parse(await readFile(unitsPath, 'utf8'))
+    doc.units[0].health = 100.5
+    await writeFile(unitsPath, JSON.stringify(doc, null, 2))
+
+    await expect(buildProject(project)).rejects.toThrow(/health.*integer|integer.*health/i)
+  })
+
   test('.cnetool/base/ is committed (not matched by the generated .gitignore)', async () => {
     const install = await tmp()
     const project = await tmp()

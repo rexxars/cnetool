@@ -243,6 +243,10 @@ const ARMOR_BY_VALUE = new Map<string, UnitArmor>([
 // Stock capitalization for each armor class, as written in the shipped tables.
 const ARMOR_LABEL: Record<UnitArmor, string> = {heavy: 'Heavy', light: 'Light', none: 'None'}
 
+/** The canonical {@link UnitArmor} classes, in stock order — the single source of
+ * truth for the armor set (consumers validating JSON should narrow against this). */
+export const UNIT_ARMORS: readonly UnitArmor[] = ['heavy', 'light', 'none']
+
 function parseArmor(value: string, name: string): UnitArmor {
   const armor = ARMOR_BY_VALUE.get(value.trim().toLowerCase())
   if (armor === undefined) {
@@ -397,7 +401,9 @@ export interface WeaponTable {
 // for case-insensitive key/value lookup and the header completeness check (which
 // is order-independent), while AMMO_HEADER_ORDER is the stock *file* order the
 // serializer must emit. Don't collapse them - alphabetical here, stock there.
-const AMMO_TYPES: AmmoType[] = ['bullet', 'gas', 'shell']
+/** The canonical {@link AmmoType} categories, alphabetical — the single source of
+ * truth for the ammo set (consumers validating JSON should narrow against this). */
+export const AMMO_TYPES: readonly AmmoType[] = ['bullet', 'gas', 'shell']
 
 // Stock file order of the header damage rows (gas, bullet, shell) - preserved on
 // serialize to keep a minimal, faithful diff against the shipped tables.
