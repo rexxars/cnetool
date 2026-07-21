@@ -20,10 +20,10 @@ cnetool init /path/to/game my-mod
 
 `project-dir` defaults to the current directory. It must be empty or a fresh path - `init` refuses to scatter a source tree into an unrelated non-empty directory, and rejects an already-initialized project (it does not overwrite). The `game` path is recorded in the project manifest (`cnetool.json`) so `build` knows where the source install came from.
 
-| Argument      | Description                                                              |
-| ------------- | ------------------------------------------------------------------------ |
-| `game-dir`    | The Codename Eagle install to import (required).                         |
-| `project-dir` | Where to create the project. Defaults to the current directory.          |
+| Argument      | Description                                                     |
+| ------------- | --------------------------------------------------------------- |
+| `game-dir`    | The Codename Eagle install to import (required).                |
+| `project-dir` | Where to create the project. Defaults to the current directory. |
 
 ### `cnetool build [project-dir] [--no-cache]`
 
@@ -39,11 +39,11 @@ cnetool build my-mod --no-cache
 
 `project-dir` defaults to the **nearest ancestor of the current directory that contains a `cnetool.json`** (walking up to the filesystem root), so `build` works from anywhere inside the tree. Copy-through files (sounds, animations, raw) are skipped when unchanged via a build cache keyed on source mtime + size; `--no-cache` re-copies everything.
 
-| Option       | Description                                                    |
-| ------------ | -------------------------------------------------------------- |
-| `--no-cache` | Ignore the build cache; re-copy every passthrough file.       |
-| `--watch`    | Reserved - rebuild on change. Not yet implemented.            |
-| `-h, --help` | Show help.                                                     |
+| Option       | Description                                             |
+| ------------ | ------------------------------------------------------- |
+| `--no-cache` | Ignore the build cache; re-copy every passthrough file. |
+| `--watch`    | Reserved - rebuild on change. Not yet implemented.      |
+| `-h, --help` | Show help.                                              |
 
 ## Project layout
 
@@ -89,17 +89,17 @@ cnetool build my-mod --no-cache
 
 ### What each area maps to on build
 
-| Source area                     | Build output                                             | How it's stored                                                                          |
-| ------------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `textures/<archive>/`           | `24bits/textures.dat`, `24bits/texsec.dat`, `menu/menupics.dat` | PNGs (+ raw `.bin`) repacked into the archive; `entries.json` restores names + order.    |
-| `objects/<archive>/`            | `objects.dat`, `objects2.dat`                            | One mesh directory per project + `raw/` blobs, repacked; `textures.json` + `entries.json`.|
-| `stats/*.json`                  | `data3.bin`, `data4.bin`, `mdata3.bin`, `mdata4.bin`     | Re-serialized to the obfuscated stat-table binary.                                        |
-| `settings/menuinfo.json`        | `menuinfo.dat`                                           | Patched over the pristine `.cnetool/base/menuinfo.dat` and re-deflated.                   |
-| `settings/servinfo.json`        | `servinfo.dat`                                           | Re-serialized to the four-uint32 binary.                                                  |
-| `config/keyconf.txt`            | `keyconf.dat`                                            | Copied back as latin1 text, byte-exact.                                                   |
-| `sounds/`                       | `sounds/`                                                | Passthrough (copied unchanged).                                                           |
-| `animations/`                   | `anm/`                                                   | Passthrough.                                                                              |
-| `raw/`                          | its install-relative path                                | Passthrough.                                                                              |
+| Source area              | Build output                                                    | How it's stored                                                                            |
+| ------------------------ | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `textures/<archive>/`    | `24bits/textures.dat`, `24bits/texsec.dat`, `menu/menupics.dat` | PNGs (+ raw `.bin`) repacked into the archive; `entries.json` restores names + order.      |
+| `objects/<archive>/`     | `objects.dat`, `objects2.dat`                                   | One mesh directory per project + `raw/` blobs, repacked; `textures.json` + `entries.json`. |
+| `stats/*.json`           | `data3.bin`, `data4.bin`, `mdata3.bin`, `mdata4.bin`            | Re-serialized to the obfuscated stat-table binary.                                         |
+| `settings/menuinfo.json` | `menuinfo.dat`                                                  | Patched over the pristine `.cnetool/base/menuinfo.dat` and re-deflated.                    |
+| `settings/servinfo.json` | `servinfo.dat`                                                  | Re-serialized to the four-uint32 binary.                                                   |
+| `config/keyconf.txt`     | `keyconf.dat`                                                   | Copied back as latin1 text, byte-exact.                                                    |
+| `sounds/`                | `sounds/`                                                       | Passthrough (copied unchanged).                                                            |
+| `animations/`            | `anm/`                                                          | Passthrough.                                                                               |
+| `raw/`                   | its install-relative path                                       | Passthrough.                                                                               |
 
 The **object mesh directories** (`objects/<archive>/<project>/`: `high.obj`, optional `medium.obj`/`low.obj`, `detect.obj`, `model.mtl`, `project.json`) are documented in full in [the objects.dat project directory format](./formats.md#project-directory-format-cnetool-initbuild) - see that section rather than restating it here.
 
