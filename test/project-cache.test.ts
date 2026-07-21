@@ -54,6 +54,30 @@ describe('loadCache', () => {
     await writeFile(path, JSON.stringify({version: 99, entries: {}}))
     expect(await loadCache(path)).toEqual({version: 1, entries: {}})
   })
+
+  test('returns empty cache when entries is an array', async () => {
+    const dir = await tmp()
+    const path = join(dir, 'cache.json')
+    await writeFile(path, JSON.stringify({version: 1, entries: []}))
+    expect(await loadCache(path)).toEqual({version: 1, entries: {}})
+  })
+
+  test('returns empty cache when an entry has a malformed shape', async () => {
+    const dir = await tmp()
+    const path = join(dir, 'cache.json')
+    await writeFile(
+      path,
+      JSON.stringify({
+        version: 1,
+        entries: {
+          good: {mtimeMs: 1, size: 2, hash: 'ok'},
+          missingHash: {mtimeMs: 3, size: 4},
+          stringSize: {mtimeMs: 5, size: '6', hash: 'bad'},
+        },
+      }),
+    )
+    expect(await loadCache(path)).toEqual({version: 1, entries: {}})
+  })
 })
 
 describe('saveCache / loadCache round-trip', () => {
@@ -79,6 +103,20 @@ describe('hashFile', () => {
     const dir = await tmp()
     const path = join(dir, 'blob.bin')
     const bytes = new Uint8Array([0, 1, 2, 3, 250, 251, 252, 253, 254, 255, 42, 7])
+    await writeFile(path, bytes)
+
+    const expected = toHex(await crypto.subtle.digest('SHA-256', bytes))
+    expect(await hashFile(path)).toBe(expected)
+  })
+
+  test('streams a payload larger than the read highWaterMark', async () => {
+    const dir = await tmp()
+    const path = join(dir, 'big.bin')
+    // 200 KB of varied bytes (well past the 64 KB default highWaterMark),
+    // so a single-buffer regression would still be caught but the point is
+    // that multiple stream chunks feed the hash.
+    const bytes = new Uint8Array(200 * 1024)
+    for (let i = 0; i < bytes.length; i++) bytes[i] = (i * 31 + 7) & 0xff
     await writeFile(path, bytes)
 
     const expected = toHex(await crypto.subtle.digest('SHA-256', bytes))

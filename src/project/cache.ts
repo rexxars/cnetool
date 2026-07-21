@@ -25,16 +25,33 @@ function isEnoent(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT'
 }
 
-function isBuildCache(value: unknown): value is BuildCache {
+function isCacheEntry(value: unknown): value is CacheEntry {
   return (
     typeof value === 'object' &&
     value !== null &&
-    'version' in value &&
-    value.version === 1 &&
-    'entries' in value &&
-    typeof value.entries === 'object' &&
-    value.entries !== null
+    'mtimeMs' in value &&
+    typeof value.mtimeMs === 'number' &&
+    'size' in value &&
+    typeof value.size === 'number' &&
+    'hash' in value &&
+    typeof value.hash === 'string'
   )
+}
+
+function isBuildCache(value: unknown): value is BuildCache {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    !('version' in value) ||
+    value.version !== 1 ||
+    !('entries' in value) ||
+    typeof value.entries !== 'object' ||
+    value.entries === null ||
+    Array.isArray(value.entries)
+  ) {
+    return false
+  }
+  return Object.values(value.entries).every(isCacheEntry)
 }
 
 /**
