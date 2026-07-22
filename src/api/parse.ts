@@ -31,7 +31,7 @@ const TEXTURE_RECORD_LENGTH = 13
 /**
  * Parse the table of contents of a Codename Eagle data archive.
  *
- * The format is documented in `docs/formats.md`: a uint32 entry count followed
+ * The format is a uint32 entry count followed
  * by fixed {@link RECORD_LENGTH}-byte records (a NUL-terminated name field plus
  * a 4-byte absolute data offset), followed by the data blobs. This describes
  * the container only; it does not interpret payloads, so it works for texture

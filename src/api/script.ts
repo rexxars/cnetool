@@ -17,7 +17,7 @@ const decoder = new TextDecoder('latin1')
  * and verified by compiling probe snippets. Each instruction serializes as
  * `[u8 opcode][u16 operandLen][operand]`. Comparisons are *synthesized* by the
  * compiler (eg `a < b` → `sub` then `ltz`), so there is no dedicated `<`/`>`/`==`
- * opcode - see `docs/formats.md`.
+ * opcode.
  */
 const OPCODES: Record<
   number,
@@ -51,7 +51,7 @@ const MAX_OPCODE = 0x10
  * Keys are lowercased (the engine resolves handler names case-insensitively). Only
  * parameters whose role is established are named; the rest stay `vN`. Roles were
  * derived by mining how each parameter flows into `REF*` calls across all shipped
- * scripts (see `docs/scripts.md` → *Callbacks*):
+ * scripts:
  *
  * - `EnterVehicle` → both args go to `REFChangeVehicle(player, vehicle)`.
  * - `SeePlayer` / `HeardFiring` → fired on the AI (the AI is `MYSELF`); the engine pushes
@@ -96,8 +96,7 @@ const paramName = (handler: string, index: number): string =>
  * handler names case-insensitively, so scripts spell these inconsistently
  * (`startup`/`StartUp`/`startUp`, `seeplayer`/`SeePlayer`); the decompiler normalizes
  * the known ones to a single PascalCase form. Author-defined handlers (which have no
- * canonical form) are left exactly as written. Names confirmed as literals in `ce.exe`
- * (see `docs/scripts.md` → *Callbacks*).
+ * canonical form) are left exactly as written. Names confirmed as literals in `ce.exe`.
  */
 const CANONICAL_CALLBACKS: Record<string, string> = {
   startup: 'Startup',

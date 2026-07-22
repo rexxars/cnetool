@@ -159,7 +159,7 @@ export interface TgaToPngOptions {
    * a texture has no inherent transparency - the engine keys black only on **draws** that
    * enable it (a mesh face's `0x02` flag), so the model exporters pass this per keyed face
    * while plain texture dumps leave it off. 32-bit textures keep their own alpha regardless
-   * (the key only applies to alpha-less 24-bit images). See `docs/formats.md`.
+   * (the key only applies to alpha-less 24-bit images).
    */
   colorKey?: boolean
   /**

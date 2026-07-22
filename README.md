@@ -4,7 +4,7 @@
 
 Tools for working with [Codename Eagle](https://en.wikipedia.org/wiki/Codename_Eagle) game data files. Use it programmatically as a library, or through the `cnetool` command line interface. The library is split into an `api` layer (operates on `Uint8Array`) and a Node.js `cli` layer that wraps it - the CLI is a thin shell around the same API methods you can call yourself.
 
-It can unpack the game's `.dat` archives (`textures.dat`, `MENU/menupics.dat`, `objects.dat`, …) into their individual entries. Texture entries are rebuilt into standalone TGA files; entries whose payload isn't a known format are written out as their raw stored blobs. The reverse-engineered file format is documented in [`docs/formats.md`](./docs/formats.md).
+It can unpack the game's `.dat` archives (`textures.dat`, `MENU/menupics.dat`, `objects.dat`, …) into their individual entries. Texture entries are rebuilt into standalone TGA files; entries whose payload isn't a known format are written out as their raw stored blobs.
 
 For more info about the game, see [Codename Eagle Nation](https://codenameeagle.net/).
 
@@ -33,7 +33,7 @@ cnetool init /path/to/game            # into the current directory
 cnetool init /path/to/game my-mod     # into a new project directory
 ```
 
-`project-dir` defaults to the current directory and must be empty or a fresh path. See [`docs/project.md`](./docs/project.md) for the source-tree layout and round-trip fidelity.
+`project-dir` defaults to the current directory and must be empty or a fresh path.
 
 ### `cnetool build [project-dir]`
 
@@ -44,7 +44,7 @@ cnetool build                     # build the project containing the current dir
 cnetool build my-mod --no-cache   # build a specific project, ignoring the cache
 ```
 
-`project-dir` defaults to the nearest ancestor directory containing a `cnetool.json`. Pass `--no-cache` to re-copy every passthrough file (the build cache otherwise skips unchanged ones). See [`docs/project.md`](./docs/project.md).
+`project-dir` defaults to the nearest ancestor directory containing a `cnetool.json`. Pass `--no-cache` to re-copy every passthrough file (the build cache otherwise skips unchanged ones).
 
 ### `cnetool extract <archive...>`
 
@@ -67,7 +67,7 @@ cnetool extract textures.dat menupics.dat objects.dat
 | `-o, --output` | Output directory. Defaults to a directory named after each archive. |
 | `-h, --help`   | Show help.                                                          |
 
-Extraction is a faithful raw unpack: the game makes a 24-bit texture's black see-through at draw time (a per-draw color key, not part of the texture - see [`docs/formats.md`](./docs/formats.md)), so extracted images keep their black pixels. The model export commands below apply the key per face, matching the engine.
+Extraction is a faithful raw unpack: the game makes a 24-bit texture's black see-through at draw time (a per-draw color key, not part of the texture), so extracted images keep their black pixels. The model export commands below apply the key per face, matching the engine.
 
 ### `cnetool mesh <objects.dat> [name...]`
 
@@ -214,7 +214,7 @@ cnetool servinfo servinfo.dat --frag 25 --nextmap off           # 25 frags, rota
 
 ### `cnetool server <list|query>`
 
-Discover and query live Codename Eagle multiplayer servers over the network. `server list` fetches the community master list (`https://ceservers.net/iplist.txt`) and, by default, also scans the LAN for beaconing hosts, then queries each for its live status; `server query <ip[:port]>` reports one server's status and player roster. The list is community-run and best-effort — only servers patched to announce to ceservers.net (or running 1.50+) appear in it. See [`docs/network.md`](./docs/network.md) for the protocols.
+Discover and query live Codename Eagle multiplayer servers over the network. `server list` fetches the community master list (`https://ceservers.net/iplist.txt`) and, by default, also scans the LAN for beaconing hosts, then queries each for its live status; `server query <ip[:port]>` reports one server's status and player roster. The list is community-run and best-effort — only servers patched to announce to ceservers.net (or running 1.50+) appear in it.
 
 ```bash
 cnetool server list                        # master list + LAN, live status table
@@ -237,7 +237,7 @@ Scanning the LAN binds the privileged UDP port 210, so `server list` may need el
 
 ## API usage
 
-Everything the CLI does is available as plain functions that take and return `Uint8Array`s and data structures: only the CLI touches the filesystem, so the API works in Node, browsers and workers alike. The sections below tour the most common operations; the complete reference covering every export is in [`docs/api.md`](./docs/api.md).
+Everything the CLI does is available as plain functions that take and return `Uint8Array`s and data structures: only the CLI touches the filesystem, so the API works in Node, browsers and workers alike. The sections below tour the most common operations.
 
 ```ts
 import {readFile, writeFile} from 'node:fs/promises'
@@ -273,7 +273,7 @@ All of these operate on a `Uint8Array` - only the CLI touches the filesystem.
 
 ## Text-config files
 
-Most of the game's other `.dat` files are not archives but plain `Key:Value` text (`MOBJS.DAT`, `BRIEF.DAT`, `MATS.DAT`, `KEYCONF.DAT`, …). `parseConfig` reads that family, and `groupRecords` splits the repeated-key files into records. See [`docs/formats.md`](./docs/formats.md) for what each file is.
+Most of the game's other `.dat` files are not archives but plain `Key:Value` text (`MOBJS.DAT`, `BRIEF.DAT`, `MATS.DAT`, `KEYCONF.DAT`, …). `parseConfig` reads that family, and `groupRecords` splits the repeated-key files into records.
 
 ```ts
 import {readFile} from 'node:fs/promises'
@@ -307,7 +307,7 @@ for (const record of groupRecords(parseConfig(data, {scan: true}), 'Name')) {
 
 ## Localization files
 
-The game's localized text comes in two related formats, each with a dedicated parser. Both accept a string or raw (Latin-1) bytes. See [`docs/formats.md`](./docs/formats.md) for details.
+The game's localized text comes in two related formats, each with a dedicated parser. Both accept a string or raw (Latin-1) bytes.
 
 `parseDialogue` reads `DIALOGUE.DAT` - a `Languages:N` header followed by records, each a `Filename:` id and one quoted line per language (multi-line cutscene values are handled):
 
@@ -334,7 +334,7 @@ for (const {language, text} of parseBriefing(await readFile('LEVEL12/MISSION.DAT
 
 ## Binary level files
 
-Two of the small per-level binary files have decoders. Both take raw bytes. See [`docs/formats.md`](./docs/formats.md) for the byte layouts.
+Two of the small per-level binary files have decoders. Both take raw bytes.
 
 `parseMatrix` reads `MAPMTX.DAT` - a 3×3 affine matrix (9 float32) that maps world coordinates to minimap pixels. `projectToMap` applies it:
 
@@ -435,7 +435,7 @@ await writeFile('LEVEL128/World.dat', formatWorld(entries))
 
 ## Scripts (`.scr` files)
 
-The game's behavior is driven by compiled scripts (`MAINSCR.SCR` and the per-object `.scr` files inside `objects.dat`) running on a small stack VM in the engine. `parseScript` decodes the bytecode, `decompileScript` turns it into readable C-like source, and `compileScript` compiles that source back to bytecode the engine runs - so you can read, edit and rebuild the game's scripts. The language, the engine callbacks and all 128 built-in `REF` functions are documented in [`docs/scripts.md`](./docs/scripts.md).
+The game's behavior is driven by compiled scripts (`MAINSCR.SCR` and the per-object `.scr` files inside `objects.dat`) running on a small stack VM in the engine. `parseScript` decodes the bytecode, `decompileScript` turns it into readable C-like source, and `compileScript` compiles that source back to bytecode the engine runs - so you can read, edit and rebuild the game's scripts. The VM covers a small C-like language (`float`-only values, `if`/`else`/`while`, functions), the engine event callbacks, and 128 built-in `REF` functions.
 
 ```ts
 import {readFile, writeFile} from 'node:fs/promises'
@@ -452,7 +452,7 @@ await writeFile('LEVEL128/MAINSCR.SCR', compileScript(source))
 
 ## Tab maps
 
-The in-game full-screen map is four texture tiles plus a world-to-pixel matrix; `renderTabMap` renders a terrain mesh top-down with real texture sampling, `sliceTabMapTiles` + `buildTextureArchive` pack it into a `leveltex.bin`, and `tabMapMatrix` computes the matching `MAPMTX.DAT`. `extractTabMap` reassembles a level's existing map into one image. This is what `cnetool tabmap` drives; the individual steps (framing, grayscale styling, windowing) are all exported - see [`docs/api.md`](./docs/api.md#tab-maps) and the format notes in [`docs/formats.md`](./docs/formats.md).
+The in-game full-screen map is four texture tiles plus a world-to-pixel matrix; `renderTabMap` renders a terrain mesh top-down with real texture sampling, `sliceTabMapTiles` + `buildTextureArchive` pack it into a `leveltex.bin`, and `tabMapMatrix` computes the matching `MAPMTX.DAT`. `extractTabMap` reassembles a level's existing map into one image. This is what `cnetool tabmap` drives; the individual steps (framing, grayscale styling, windowing) are all exported.
 
 ## Images
 
@@ -471,18 +471,7 @@ const pixels = decodePng(png)
 
 `decodeTga`/`decodePng` give raw RGB(A) pixels; `encodePng`/`encodeTga` go back. TGAs are uncompressed true-color (24/32-bit); `decodePng` supports 8-bit RGB/RGBA PNGs (all five scanline filters).
 
-## Documentation
-
-The full API reference and the reverse-engineering notes on the game's data live in [`docs/`](./docs):
-
-- [`api.md`](./docs/api.md) - the complete API reference, every exported function and type
-- [`formats.md`](./docs/formats.md) - confirmed file formats
-- [`scripts.md`](./docs/scripts.md) - the scripting guide: execution model, variables, engine callbacks, and the 128 `REF` built-in functions
-- [`files.md`](./docs/files.md) - inventory of a Codename Eagle install, by kind
-- [`project.md`](./docs/project.md) - the `init`/`build` project source-tree workflow
-- [`game-flow.md`](./docs/game-flow.md) - how the formats tie together (boot → level → scripts)
-- [`network.md`](./docs/network.md) - multiplayer: server discovery and the wire protocol
-- [`new-level-recipe.md`](./docs/new-level-recipe.md) - step-by-step recipe for building a new level
+## Contributing
 
 Contributing - and the API-vs-CLI separation of concerns - is in [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 

@@ -76,7 +76,7 @@ export const LIGHT_POSITION_OFFSET = 11
  * zlib-compressed under two layers of a cyclic byte-add cipher whose keys are
  * developer taunts baked into `ce.exe`. Decode subtracts KEY1 (outer, over the
  * compressed body) then inflates then subtracts KEY2 (inner, over the payload);
- * encode is the inverse. See `docs/formats.md`.
+ * encode is the inverse.
  */
 export const MENUINFO_KEY1 =
   "You really shouldn't be messing about with this file, you should be playing the game. You will find nothing in here you know ;-)"
@@ -90,8 +90,7 @@ export const MENUINFO_STRUCT_OFFSET = 16
 export const MENUINFO_PAYLOAD_SIZE = 816
 
 /**
- * Network ports for multiplayer discovery / queries (all UDP). See
- * `docs/network.md` for the full protocol breakdown.
+ * Network ports for multiplayer discovery / queries (all UDP).
  */
 /** GameSpy query port - where a server answers `\status\`-style queries. */
 export const GAMESPY_QUERY_PORT = 4711
@@ -106,8 +105,7 @@ export const IPLIST_URL = 'https://ceservers.net/iplist.txt'
 /**
  * LAN beacon (`'D'` → `:210`) byte layout. The 24-byte payload is the type-3
  * status reply minus its 4-byte IP field. Confirmed against captured beacons
- * (incl. a 25-char name that disambiguates offsets 7 and 13). See
- * `docs/network.md` §3.
+ * (incl. a 25-char name that disambiguates offsets 7 and 13).
  */
 export const LAN_BEACON_TYPE = 0x44 // 'D'
 /** Server-name length is stored here as `name_len + 7`. */
@@ -122,8 +120,7 @@ export const LAN_BEACON_NAME_OFFSET = 14
 /**
  * Script-VM enums - the symbolic names for the magic-number arguments to the
  * `REF` builtins. Sourced from the original CE script SDK header (`Global.h`,
- * shipped inside `LEVEL133`), cross-checked against the 1.41 engine. See
- * `docs/scripts.md` for the per-slot RE notes and confidence.
+ * shipped inside `LEVEL133`), cross-checked against the 1.41 engine.
  */
 
 /**

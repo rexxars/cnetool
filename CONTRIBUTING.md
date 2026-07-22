@@ -47,4 +47,4 @@ npm test           # vitest run
 npm run build      # tsc -p tsconfig.build.json
 ```
 
-Run all of them before opening a pull request. New `api` functions need unit tests; new format findings should be documented in [`docs/formats.md`](./docs/formats.md), with the confidence level (confirmed in-engine vs inferred) stated.
+Run all of them before opening a pull request. New `api` functions need unit tests; new format findings should be documented, with the confidence level (confirmed in-engine vs inferred) stated.

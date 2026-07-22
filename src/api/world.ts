@@ -11,7 +11,7 @@ const IDENTITY = [1, 0, 0, 0, 1, 0, 0, 0, 1]
  * Parse a level's text `World.dat` into placements.
  *
  * `World.dat` is the engine's human-readable level-placement format (the text
- * twin of the binary `data1.bin`; see `docs/formats.md`). Each object is a block:
+ * twin of the binary `data1.bin`). Each object is a block:
  *
  * ```
  * Name:tank_01

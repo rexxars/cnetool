@@ -79,7 +79,7 @@ export interface MeshFace {
   /**
    * Raw render-flags byte. Decoded bits (internal-flag mapping confirmed; gameplay
    * names not): `0x04` = use raw color (else color is scaled), `0x20`/`0x40`/`0x80`
-   * pass through to render flags. See `docs/formats.md`.
+   * pass through to render flags.
    */
   flags: number
   /** Texture id, or `null` when the face is untextured (raw value `0xffff`). */
@@ -350,8 +350,16 @@ export interface ServerInfo {
 
 /**
  * The persisted menu profile / options from `menuinfo.dat` (the `PlayInfo` +
- * `OptionsMenu` blocks). Numeric fields keep the game's raw byte values; see
- * `docs/formats.md` for the enums (team, game mode, renderer, language, ...).
+ * `OptionsMenu` blocks). Numeric fields keep the game's raw byte values rather
+ * than decoding them. The confirmed enums are:
+ *
+ * - `gameMode`: `0` = deathmatch, `1` = ctf, `2` = teamplay.
+ * - `team`: `0` = red, `1` = blue, `2` = auto (a directive, not a stored state -
+ *   hosting with auto assigns and persists a concrete team, so a saved file only
+ *   ever holds `0`/`1`).
+ * - `renderer`: `0` = 3dfx/Glide, `1` = Direct3D, `2` = software.
+ * - `language` (EFIGS): `1` = English, `2` = Spanish, `3` = Italian, `4` = French,
+ *   `5` = German.
  */
 export interface MenuInfo {
   /** Last-played level: SP campaign number, or an MP map (`>= 128`). */

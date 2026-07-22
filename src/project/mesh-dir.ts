@@ -125,7 +125,8 @@ export async function extractMeshDir(
  * LOD OBJs (`high`/`medium`/`low`) and the `detect.obj` hull, rebuilds each layer
  * with `objToMesh`, and serializes them. For a clean cetool-authored mesh this is
  * byte-identical to the extracted blob; for a shipped mesh it is geometrically
- * faithful (see `docs/formats.md`).
+ * faithful (the vertices, faces and materials round-trip, but the exact stored
+ * byte layout - padding, vertex ordering - is not always reproduced).
  *
  * @param dir - A project directory.
  * @param textureNames - The archive's texId → filename table (index = texId), for

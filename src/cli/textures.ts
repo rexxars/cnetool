@@ -6,7 +6,7 @@ import {decodePng, encodePng, extractTexture, tgaToPng} from '../api/index.ts'
 import type {GltfMaterialInput, Mesh, MeshFace, ResolvedTexture} from '../api/index.ts'
 
 // CE keys a 24-bit texture's black to transparent only on faces whose material
-// carries file flag 0x02 (see docs/formats.md); the same texture can be drawn
+// carries file flag 0x02; the same texture can be drawn
 // keyed on one face and opaque on another (eg LOCOMTV: transparent wheels,
 // solid body). Models capture this exactly, since the flag is per face: keyed
 // faces get a `<name>_key` material with black cut out, plain faces the opaque

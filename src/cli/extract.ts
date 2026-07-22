@@ -13,7 +13,7 @@ files; any other entry is written out as its raw stored blob.
 
 Textures export as-is: a 32-bit texture keeps its alpha (RGBA PNG), a 24-bit one
 stays opaque RGB. CE makes a 24-bit texture's black see-through at draw time via a
-per-draw color-key (engine behaviour, not the texture's - see docs/formats.md), so
+per-draw color-key (engine behaviour, not the texture's), so
 it is not reproduced here.
 
 Options:

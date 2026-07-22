@@ -220,8 +220,6 @@ const WARSHIP_GUNS: ControllablePart[] = [
  * patches' `OBJECTS2.DAT` (helicopter, zeppelin, battleships); pass it via
  * `assembleLevel`'s `extraObjects` option so they resolve. The map is exported and
  * overridable, eg `{...controllableGeometry, tank: ['…']}`.
- *
- * See `docs/formats.md` → *Enterable vehicles & turrets*.
  */
 export const controllableGeometry: ControllableGeometryMap = {
   // Ground vehicles (bodies confirmed by the ce.exe resolver). Side/wheel parts

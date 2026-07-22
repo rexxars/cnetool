@@ -17,7 +17,7 @@ import type {GameServerStatus, LanBeacon, LanServer} from './types.ts'
  * Parse a Codename Eagle LAN beacon - the 24-byte `'D'` datagram a host
  * broadcasts to UDP `:210` about once a second.
  *
- * Layout (see `docs/network.md` §3): byte 0 is `0x44` (`'D'`), byte 12 is
+ * Layout: byte 0 is `0x44` (`'D'`), byte 12 is
  * `numPlayers + 1` (connected remote clients - a listen server's own host-player
  * is not counted, so this can read below GameSpy `numplayers`), byte 13 is
  * `maxPlayers + 1` **clamped to 16** (so `maxPlayers` is exact only for ≤15-slot

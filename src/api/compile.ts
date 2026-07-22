@@ -1,6 +1,6 @@
 /**
  * A compiler for the Codename Eagle `.scr` C-subset source language, targeting the
- * stack-machine bytecode documented in `docs/formats.md`. This is the inverse of
+ * stack-machine bytecode. This is the inverse of
  * `parseScript`/`decompileScript`. It emits a **complete, loadable `.scr`** (header +
  * per-handler descriptors + bytecode); the instruction stream is byte-identical to
  * `CPARSE.EXE` output, and the files load and run in the real engine (verified in-game:

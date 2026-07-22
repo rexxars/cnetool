@@ -88,7 +88,7 @@ function addKey(data: Uint8Array, key: Uint8Array): void {
  * Decode a `menuinfo.dat` file to its 816-byte plaintext payload (three
  * 272-byte blocks). Reverses the two-layer cipher and the zlib compression:
  * strip {@link MENUINFO_KEY1} from the body, inflate, then strip
- * {@link MENUINFO_KEY2}. See `docs/formats.md`.
+ * {@link MENUINFO_KEY2}.
  *
  * @param data - Raw `menuinfo.dat` bytes.
  */
@@ -200,7 +200,7 @@ function writeIp(data: Uint8Array, offset: number, value: string): void {
 /**
  * Parse `menuinfo.dat` into a {@link MenuInfo}. Locates the `PlayInfo` and
  * `OptionsMenu` blocks by tag and reads the confirmed fields; numeric fields
- * keep their raw byte values (see `docs/formats.md` for the enums).
+ * keep their raw byte values (the enum meanings are on {@link MenuInfo}).
  *
  * @param data - Raw `menuinfo.dat` bytes.
  */
