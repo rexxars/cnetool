@@ -205,9 +205,10 @@ function wrapTexel(t: number, n: number): number {
 
 /**
  * Nearest-neighbor sample a texture at UV (wrapped for tiling); returns `[r,g,b]`. The V axis
- * is flipped: CE textures are stored bottom-origin and {@link decodeTga} returns them top-down,
- * but mesh UVs follow the bottom-origin (`v=0` at bottom) convention - so without the flip each
- * face's texture samples upside-down, which on baked multi-tile terrain (`MULT*`) shows as
+ * is flipped: archive texture rows are stored top-down behind a lying bottom-origin descriptor
+ * (see {@link TgaToPngOptions.topOrigin}), so a descriptor-honoring {@link decodeTga} returns
+ * them vertically flipped relative to how the engine draws them - without the compensating flip
+ * each face's texture samples upside-down, which on baked multi-tile terrain (`MULT*`) shows as
  * banding/discontinuities between faces.
  */
 function sampleTexel(tex: RawImage, u: number, v: number): [number, number, number] {
