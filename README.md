@@ -34,7 +34,7 @@ cnetool extract textures.dat
 cnetool level path/to/LEVEL128 --textures --controllable -o out/level.obj
 ```
 
-Full command reference, options and examples: [`docs/cli.md`](./docs/cli.md).
+Full command reference, options and examples: [`docs/cli.md`](./docs/cli.md). The `init`/`build` project source tree - layout, manifest, and round-trip fidelity - is documented in [`docs/project.md`](./docs/project.md).
 
 ## API usage
 

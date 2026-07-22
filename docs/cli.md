@@ -36,6 +36,8 @@ cnetool init /path/to/game my-mod     # into a new project directory
 
 `project-dir` defaults to the current directory and must be empty or a fresh path.
 
+The project source tree - layout, the `cnetool.json` manifest, and what round-trips faithfully - is documented in [`docs/project.md`](./project.md).
+
 ### `cnetool build [project-dir]`
 
 Re-encode a project's `source/` tree into a complete, loadable game install under `output/` - the inverse of `init`. Texture directories repack into archives, stat/settings JSON re-serialize to binary, config texts re-encode, object directories repack, and sounds/animations/raw files are copied through. Formats without an encoder are carried as verbatim passthrough, so the rebuilt install is always complete.
